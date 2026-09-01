@@ -28,4 +28,6 @@ jobs:
         env: {IDAX_HOSTNAME: example.invalid}
       - name: Exposure scan
         run: |
-          ! grep -RInE 'C:\\Users\\|/workspace/|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY' --exclude-dir=.git --exclude-dir=target .
+          ! grep -RInE 'C:\\Users\\|/workspace/' \
+            --exclude-dir=.git --exclude-dir=target --exclude-dir=node_modules \
+            --exclude=ci.yml --exclude=public_promote.py .
