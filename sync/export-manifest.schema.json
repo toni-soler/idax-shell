@@ -8,7 +8,7 @@
     "schemaVersion": {"const": 1},
     "component": {"type":"string","pattern":"^[a-z0-9][a-z0-9-]+$"},
     "source": {"type":"object","additionalProperties":false,"required":["repositoryId","ref","paths"],"properties":{"repositoryId":{"type":"string"},"ref":{"type":"string"},"paths":{"type":"array","items":{"type":"string"},"minItems":1}}},
-    "destination": {"type":"object","additionalProperties":false,"required":["repository","path"],"properties":{"repository":{"type":"string"},"path":{"type":"string"}}},
+    "destination": {"type":"object","additionalProperties":false,"required":["repository","path"],"properties":{"repository":{"type":"string"},"path":{"type":"string","pattern":"^(?![./]|.*(?:^|/)\\.\\.(?:/|$)).+"}}},
     "include": {"type":"array","items":{"type":"string"},"minItems":1},
     "exclude": {"type":"array","items":{"type":"string"}},
     "transformations": {"type":"array","items":{"type":"object","additionalProperties":false,"required":["id","version"],"properties":{"id":{"type":"string"},"version":{"type":"integer","minimum":1}}}},
@@ -19,4 +19,3 @@
   },
   "$defs":{"command":{"type":"array","items":{"type":"string"},"minItems":1}}
 }
-

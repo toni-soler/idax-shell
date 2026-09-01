@@ -1,9 +1,0 @@
-schemaVersion: 1
-sources:
-  - id: core-runtime-migrations
-    repository: https://github.com/toni-soler/idax-core-runtime.git
-    ref: main
-    include: [database/migration-idax-core]
-    destination: vendor/idax-core-runtime
-    license: Apache-2.0
-

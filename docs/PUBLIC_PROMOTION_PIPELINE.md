@@ -43,7 +43,16 @@ branch with a provenance report and SBOM delta. Publishing requires human
 approval and protected-branch CI. The tool has no mode that writes directly to
 the default branch.
 
+The reference implementation is `tools/public_promote.py`. It consumes JSON
+manifests validated against `sync/export-manifest.schema.json`, requires an
+immutable source commit, stages into a clean temporary directory, reports drift
+with exit code 2, and refuses `--apply` on `main` or `master`. It never fetches,
+pushes, opens a pull request or reads an undeclared repository.
+The trusted execution environment must also supply `--repository-registry`, a
+JSON map from the manifest's opaque repository alias to an allowed origin-URL
+regular expression. That registry is operational policy and is not committed
+to the public destination.
+
 Extraction is complete when the private product consumes the public package.
 At that point the export manifest is retired and the public repository is the
 only source of truth.
-

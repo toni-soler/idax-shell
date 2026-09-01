@@ -76,10 +76,9 @@ unexpected bootstrap request after installation.
 
 ## Safe synchronization
 
-The promotion scripts only accept sources declared in
-`sync/public-sources.yml`, verify the exact public remote and scan for secrets
-and environment-specific paths. They intentionally refuse private repositories.
-Reusable code should first be extracted into a separately reviewed, licensed
-public component; Shell can then consume or promote it one-to-one. This keeps
-reuse automatic without turning a private working tree into an accidental
-publication pipeline.
+The promotion tool only accepts a closed allowlist manifest conforming to
+`sync/export-manifest.schema.json`, pins an immutable source commit and scans
+for secrets and environment-specific paths. Reusable code should first be
+extracted into a separately reviewed, licensed public component; Shell can then
+consume it one-to-one. The exporter only produces drift reports or changes on a
+review branch and cannot publish silently to the default branch.

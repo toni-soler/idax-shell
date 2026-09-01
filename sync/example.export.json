@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "component": "example-component",
+  "source": {"repositoryId":"approved-source-alias","ref":"0000000000000000000000000000000000000000","paths":["component"]},
+  "destination": {"repository":"example-public","path":"components/example-component"},
+  "include": ["component/**"],
+  "exclude": ["component/target/**"],
+  "transformations": [{"id":"normalize-text","version":1}],
+  "license": {"expectedSpdx":"Apache-2.0"},
+  "forbidden": {"dependencies":["private\\.group"],"imports":["private\\.package"],"patterns":["internal\\.example"]},
+  "generatedFiles": {"policy":"reject","patterns":["**/*.generated.*"]},
+  "checks": {"format":["true"],"build":["true"],"test":["true"],"secretScan":["true"],"licenseScan":["true"]}
+}
