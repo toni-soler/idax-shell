@@ -1,0 +1,59 @@
+name: idax-open-core
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-idax}
+      POSTGRES_USER: ${POSTGRES_USER:-idax_admin}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    networks: [data]
+    healthcheck: {test: [CMD-SHELL, "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], interval: 10s, timeout: 5s, retries: 10}
+    restart: unless-stopped
+  core-migrations:
+    image: flyway/flyway:11-alpine
+    entrypoint: ["/bin/sh","-ec"]
+    command: ["export FLYWAY_PASSWORD=$$(cat /run/secrets/postgres_password); exec flyway -connectRetries=60 -schemas=idax_core -table=flyway_schema_history_idax_core migrate"]
+    environment: {FLYWAY_URL: "jdbc:postgresql://postgres:5432/${POSTGRES_DB:-idax}", FLYWAY_USER: "${POSTGRES_USER:-idax_admin}"}
+    volumes: [./vendor/idax-core-runtime/database/migration-idax-core:/flyway/sql:ro]
+    secrets: [postgres_password]
+    depends_on: {postgres: {condition: service_healthy}}
+    networks: [data]
+  shell:
+    image: ${SHELL_IMAGE:-ghcr.io/toni-soler/idax-shell:0.1.0}
+    environment: {DATABASE_URL: "jdbc:postgresql://postgres:5432/${POSTGRES_DB:-idax}", DATABASE_USER: "${POSTGRES_USER:-idax_admin}", JWT_ISSUER: "https://${IDAX_HOSTNAME}"}
+    secrets: [postgres_password,jwt_private_key,jwt_public_key,bootstrap_token]
+    depends_on: {core-migrations: {condition: service_completed_successfully}}
+    networks: [edge,data]
+    healthcheck: {test: [CMD, wget, -qO-, http://localhost:8080/actuator/health/readiness], interval: 15s, timeout: 5s, retries: 10}
+    restart: unless-stopped
+  ledger:
+    image: ${LEDGER_IMAGE:-ghcr.io/toni-soler/idax-ledger-backend:0.1.0}
+    environment: {SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/${POSTGRES_DB:-idax}", SPRING_DATASOURCE_USERNAME: "${POSTGRES_USER:-idax_admin}", SPRING_DATASOURCE_PASSWORD_FILE: /run/secrets/postgres_password, IDAX_AUTH_PUBLIC_KEY: /run/secrets/jwt_public_key}
+    secrets: [postgres_password,jwt_public_key]
+    depends_on: {core-migrations: {condition: service_completed_successfully}}
+    networks: [edge,data]
+    restart: unless-stopped
+  ostris:
+    image: ${OSTRIS_IMAGE:-ghcr.io/toni-soler/idax-ostris-backend:0.1.0}
+    environment: {SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/${POSTGRES_DB:-idax}", SPRING_DATASOURCE_USERNAME: "${POSTGRES_USER:-idax_admin}", SPRING_DATASOURCE_PASSWORD_FILE: /run/secrets/postgres_password, SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_PUBLIC_KEY_LOCATION: file:/run/secrets/jwt_public_key}
+    secrets: [postgres_password,jwt_public_key]
+    depends_on: {core-migrations: {condition: service_completed_successfully}}
+    networks: [edge,data]
+    restart: unless-stopped
+  proxy:
+    image: caddy:2.9-alpine
+    environment: {IDAX_HOSTNAME: "${IDAX_HOSTNAME}"}
+    volumes: [./deploy/Caddyfile:/etc/caddy/Caddyfile:ro,caddy_data:/data,caddy_config:/config]
+    ports: ["80:80","443:443"]
+    depends_on: {shell: {condition: service_healthy}}
+    networks: [edge]
+    restart: unless-stopped
+networks: {edge: {}, data: {internal: true}}
+volumes: {postgres_data: {}, caddy_data: {}, caddy_config: {}}
+secrets:
+  postgres_password: {external: true}
+  jwt_private_key: {external: true}
+  jwt_public_key: {external: true}
+  bootstrap_token: {external: true}

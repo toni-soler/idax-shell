@@ -1,0 +1,7 @@
+IDAX Shell
+Copyright 2026 Toni Soler
+
+This repository is independently authored and licensed under Apache-2.0.
+It depends on the separately licensed IDAX Core Runtime binary. That binary is
+not part of this source repository or covered by this repository's license.
+

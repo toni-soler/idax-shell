@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/toni-soler/idax-shell/schemas/export-manifest-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion","component","source","destination","include","exclude","transformations","license","forbidden","generatedFiles","checks"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "component": {"type":"string","pattern":"^[a-z0-9][a-z0-9-]+$"},
+    "source": {"type":"object","additionalProperties":false,"required":["repositoryId","ref","paths"],"properties":{"repositoryId":{"type":"string"},"ref":{"type":"string"},"paths":{"type":"array","items":{"type":"string"},"minItems":1}}},
+    "destination": {"type":"object","additionalProperties":false,"required":["repository","path"],"properties":{"repository":{"type":"string"},"path":{"type":"string"}}},
+    "include": {"type":"array","items":{"type":"string"},"minItems":1},
+    "exclude": {"type":"array","items":{"type":"string"}},
+    "transformations": {"type":"array","items":{"type":"object","additionalProperties":false,"required":["id","version"],"properties":{"id":{"type":"string"},"version":{"type":"integer","minimum":1}}}},
+    "license": {"type":"object","additionalProperties":false,"required":["expectedSpdx"],"properties":{"expectedSpdx":{"type":"string"}}},
+    "forbidden": {"type":"object","additionalProperties":false,"required":["dependencies","imports","patterns"],"properties":{"dependencies":{"type":"array","items":{"type":"string"}},"imports":{"type":"array","items":{"type":"string"}},"patterns":{"type":"array","items":{"type":"string"}}}},
+    "generatedFiles": {"type":"object","additionalProperties":false,"required":["policy"],"properties":{"policy":{"enum":["reject","allow-declared","regenerate"]},"patterns":{"type":"array","items":{"type":"string"}}}},
+    "checks": {"type":"object","additionalProperties":false,"required":["format","build","test","secretScan","licenseScan"],"properties":{"format":{"$ref":"#/$defs/command"},"build":{"$ref":"#/$defs/command"},"test":{"$ref":"#/$defs/command"},"secretScan":{"$ref":"#/$defs/command"},"licenseScan":{"$ref":"#/$defs/command"}}}
+  },
+  "$defs":{"command":{"type":"array","items":{"type":"string"},"minItems":1}}
+}
+

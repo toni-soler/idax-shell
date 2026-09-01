@@ -1,0 +1,8 @@
+{$IDAX_HOSTNAME} {
+  encode zstd gzip
+  handle /api/ledger/* { reverse_proxy ledger:8080 }
+  handle /api/ostris/* { reverse_proxy ostris:8080 }
+  handle { reverse_proxy shell:8080 }
+  header { Strict-Transport-Security "max-age=31536000; includeSubDomains"; X-Content-Type-Options nosniff; Referrer-Policy no-referrer }
+}
+
