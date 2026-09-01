@@ -5,4 +5,5 @@ frontend/dist/
 secrets/*
 !secrets/README.md
 sbom/*.json
-
+__pycache__/
+*.py[cod]
