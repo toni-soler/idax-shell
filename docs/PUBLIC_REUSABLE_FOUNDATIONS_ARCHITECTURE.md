@@ -31,8 +31,9 @@ Do not create one repository per small package. The proposed minimum is:
    contract/SDK and, only after real extraction, UI and i18n packages.
 3. Existing product repositories remain canonical for Ledger and osTRIS.
 
-No repository is created until ownership/licensing and npm namespace gates are
-resolved. This avoids empty public packages and permanent sync copies.
+No repository is created until third-party review, security/refactor and npm
+namespace gates are resolved. The owner has authorized selected own-code
+components. This avoids empty public packages and permanent sync copies.
 
 ## Proposed coordinates
 
@@ -72,11 +73,12 @@ Ledger, osTRIS, UI or i18n versions to move together.
 
 ## Current stop conditions
 
-- Platform and Frontend have no public source license declaration.
-- MFA is structurally part of LOCAL login; it cannot be silently omitted.
-- refresh-token verification must use the authoritative decoder before auth is
-  eligible for extraction.
+- selected own-code paths are authorized; exact export manifests and
+  destination LICENSE/NOTICE files remain required.
+- MFA is structurally part of LOCAL login; its public protocol boundary must
+  remain part of the extraction.
+- refresh-token verification passes on its WIP source branch and must be
+  merged before extraction.
 - `@idax` npm scope ownership is unverified.
 - the full audit service contains private Sales interpretation and cannot be
   promoted as a generic audit runtime.
-

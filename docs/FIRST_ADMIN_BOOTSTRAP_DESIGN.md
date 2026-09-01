@@ -1,8 +1,9 @@
 # First administrator bootstrap design
 
-Bootstrap belongs to the Admin Web adapter and composes Core's onboarding and
-audit services. It is not authentication logic and is never implemented in
-Shell.
+Bootstrap belongs to the Admin Web adapter and composes a Core-neutral
+bootstrap command plus Core audit services. The existing onboarding service is
+not suitable because it also writes legacy data-area state. Bootstrap is not
+authentication logic and is never implemented in Shell.
 
 The endpoint exists only when an explicit bootstrap-secret file is configured.
 The service starts fail-closed if the file is missing, world-readable, empty or
@@ -20,4 +21,3 @@ calls return a generic unavailable response. Operators then unmount the secret.
 
 The design requires PostgreSQL/Testcontainers tests for concurrent requests,
 rollback, pre-existing admin, invalid secret, success and permanent disablement.
-
