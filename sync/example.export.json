@@ -9,5 +9,5 @@
   "license": {"expectedSpdx":"Apache-2.0"},
   "forbidden": {"dependencies":["private\\.group"],"imports":["private\\.package"],"patterns":["internal\\.example"]},
   "generatedFiles": {"policy":"reject","patterns":["**/*.generated.*"]},
-  "checks": {"format":["true"],"build":["true"],"test":["true"],"secretScan":["true"],"licenseScan":["true"]}
+  "checks": {"format":["true"],"build":["true"],"test":["true"],"secretScan":["gitleaks","dir",".","--redact"],"licenseScan":["true"]}
 }

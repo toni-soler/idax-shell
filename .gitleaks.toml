@@ -1,0 +1,10 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Java PEM parser contains marker literals, never key material"
+targetRules = ["private-key"]
+condition = "AND"
+regexTarget = "line"
+paths = ['''^src/main/java/io/github/tonisoler/idaxshell/config/SecurityConfiguration\.java$''']
+regexes = ['''\.replace\("-----BEGIN PRIVATE KEY-----", ""\)''']

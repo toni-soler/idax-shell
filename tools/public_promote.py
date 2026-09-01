@@ -12,6 +12,8 @@ def load(path: Path) -> dict:
     if data.get("schemaVersion") != 1 or set(data) != required:
         raise ValueError("manifest must be a closed v1 object")
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]+", data["component"]): raise ValueError("invalid component id")
+    secret_command=" ".join(data["checks"].get("secretScan",[])).lower()
+    if "gitleaks" not in secret_command: raise ValueError("secretScan must invoke gitleaks")
     return data
 
 

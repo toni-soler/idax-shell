@@ -20,5 +20,10 @@ class PromotionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             p=Path(tmp)/"m.json"; p.write_text(json.dumps({"schemaVersion":1,"extra":True}))
             with self.assertRaisesRegex(ValueError,"closed v1"): PROMOTE.load(p)
+    def test_manifest_rejects_fake_secret_scan(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data={"schemaVersion":1,"component":"valid-component","source":{},"destination":{},"include":[],"exclude":[],"transformations":[],"license":{},"forbidden":{},"generatedFiles":{},"checks":{"secretScan":["true"]}}
+            p=Path(tmp)/"m.json"; p.write_text(json.dumps(data))
+            with self.assertRaisesRegex(ValueError,"must invoke gitleaks"): PROMOTE.load(p)
 
 if __name__ == "__main__": unittest.main()

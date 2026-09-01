@@ -52,6 +52,8 @@ The trusted execution environment must also supply `--repository-registry`, a
 JSON map from the manifest's opaque repository alias to an allowed origin-URL
 regular expression. That registry is operational policy and is not committed
 to the public destination.
+Every manifest must invoke Gitleaks for the staged export; `true` or an omitted
+secret scanner is rejected before copying any file.
 
 Extraction is complete when the private product consumes the public package.
 At that point the export manifest is retired and the public repository is the
