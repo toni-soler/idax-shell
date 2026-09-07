@@ -21,6 +21,8 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md), the
 
 To open all public repositories together and exercise the current source-built
 local stack, follow the [VS Code local development quick steps](docs/LOCAL_DEVELOPMENT.md).
+The staged path from the private behavioral reference to a complete public host
+is documented in the [functional extraction plan](docs/FUNCTIONAL_EXTRACTION_PLAN.md).
 
 ## Build
 
