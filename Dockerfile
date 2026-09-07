@@ -3,6 +3,7 @@ WORKDIR /src/frontend
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ ./
+COPY brand/idax ./public
 RUN npm run build
 
 FROM maven:3.9.9-eclipse-temurin-21 AS backend
