@@ -19,6 +19,9 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md), the
 [open-core boundary](docs/OPEN_CORE_BOUNDARIES.md) before contributing. Version
 0.1.0 is an architecture checkpoint, not yet an installable production release.
 
+To open all public repositories together and exercise the current source-built
+local stack, follow the [VS Code local development quick steps](docs/LOCAL_DEVELOPMENT.md).
+
 ## Build
 
 Requirements: Java 21, Maven 3.9, Node 22 and Docker Compose v2.

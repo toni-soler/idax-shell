@@ -26,7 +26,10 @@ public class SecurityConfiguration {
     return http.csrf(csrf -> csrf.disable())
       .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
       .authorizeHttpRequests(a -> a
-        .requestMatchers("/actuator/health/**", "/api/shell/v1/bootstrap/status").permitAll()
+        .requestMatchers(
+          "/", "/index.html", "/favicon.ico", "/assets/**",
+          "/actuator/health/**", "/api/shell/v1/bootstrap/status"
+        ).permitAll()
         .anyRequest().authenticated())
       .oauth2ResourceServer(o -> o.jwt(jwt -> {})).build();
   }

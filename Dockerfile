@@ -8,7 +8,6 @@ RUN npm run build
 FROM maven:3.9.9-eclipse-temurin-21 AS backend
 WORKDIR /src
 COPY pom.xml ./
-RUN mvn -B dependency:go-offline
 COPY src ./src
 RUN mvn -B package -DskipTests
 
@@ -20,4 +19,3 @@ COPY --from=frontend /src/frontend/dist /app/public
 USER 10001
 EXPOSE 8080
 ENTRYPOINT ["java","-jar","/app/app.jar","--spring.web.resources.static-locations=file:/app/public/"]
-

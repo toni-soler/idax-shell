@@ -1,0 +1,126 @@
+{
+  "folders": [
+    {
+      "name": "idax-shell",
+      "path": "."
+    },
+    {
+      "name": "idax-core-runtime",
+      "path": "../idax-core-runtime"
+    },
+    {
+      "name": "idax-ledger",
+      "path": "../idax-ledger"
+    },
+    {
+      "name": "ostris",
+      "path": "../ostris"
+    }
+  ],
+  "settings": {
+    "java.autobuild.enabled": false,
+    "java.configuration.updateBuildConfiguration": "interactive",
+    "terminal.integrated.cwd": "${workspaceFolder:idax-shell}"
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Open Core: validate all sources",
+        "dependsOrder": "sequence",
+        "dependsOn": [
+          "Shell: backend verify",
+          "Shell: frontend test and build",
+          "Ledger: backend verify",
+          "Ledger: frontend test and build",
+          "osTRIS: backend verify",
+          "osTRIS: frontend test and build",
+          "Open Core: validate Compose"
+        ],
+        "problemMatcher": []
+      },
+      {
+        "label": "Open Core: validate Compose",
+        "type": "shell",
+        "command": "docker compose -f compose.local.yml config --quiet",
+        "options": { "cwd": "${workspaceFolder:idax-shell}" },
+        "problemMatcher": []
+      },
+      {
+        "label": "Open Core: initialize local secrets",
+        "type": "shell",
+        "command": "./scripts/initialize-local-env.sh",
+        "windows": { "command": "& ./scripts/initialize-local-env.ps1" },
+        "options": { "cwd": "${workspaceFolder:idax-shell}" },
+        "problemMatcher": []
+      },
+      {
+        "label": "Open Core: start local stack",
+        "type": "shell",
+        "command": "docker compose -f compose.local.yml up -d --build",
+        "dependsOn": ["Open Core: initialize local secrets"],
+        "options": { "cwd": "${workspaceFolder:idax-shell}" },
+        "problemMatcher": []
+      },
+      {
+        "label": "Open Core: show local status",
+        "type": "shell",
+        "command": "docker compose -f compose.local.yml ps",
+        "options": { "cwd": "${workspaceFolder:idax-shell}" },
+        "problemMatcher": []
+      },
+      {
+        "label": "Open Core: stop local stack",
+        "type": "shell",
+        "command": "docker compose -f compose.local.yml down",
+        "options": { "cwd": "${workspaceFolder:idax-shell}" },
+        "problemMatcher": []
+      },
+      {
+        "label": "Shell: backend verify",
+        "type": "shell",
+        "command": "mvn verify",
+        "options": { "cwd": "${workspaceFolder:idax-shell}" },
+        "problemMatcher": ["$msCompile"]
+      },
+      {
+        "label": "Shell: frontend test and build",
+        "type": "shell",
+        "command": "npm ci && npm test && npm run build",
+        "windows": { "command": "npm ci; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; npm test; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; npm run build" },
+        "options": { "cwd": "${workspaceFolder:idax-shell}/frontend" },
+        "problemMatcher": []
+      },
+      {
+        "label": "Ledger: backend verify",
+        "type": "shell",
+        "command": "mvn verify",
+        "options": { "cwd": "${workspaceFolder:idax-ledger}/backend" },
+        "problemMatcher": ["$msCompile"]
+      },
+      {
+        "label": "Ledger: frontend test and build",
+        "type": "shell",
+        "command": "npm ci && npm test && npm run i18n:validate && npm run build",
+        "windows": { "command": "npm ci; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; npm test; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; npm run i18n:validate; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; npm run build" },
+        "options": { "cwd": "${workspaceFolder:idax-ledger}/frontend" },
+        "problemMatcher": []
+      },
+      {
+        "label": "osTRIS: backend verify",
+        "type": "shell",
+        "command": "mvn verify",
+        "options": { "cwd": "${workspaceFolder:ostris}/backend" },
+        "problemMatcher": ["$msCompile"]
+      },
+      {
+        "label": "osTRIS: frontend test and build",
+        "type": "shell",
+        "command": "npm ci && npm test && npm run build",
+        "windows": { "command": "npm ci; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; npm test; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; npm run build" },
+        "options": { "cwd": "${workspaceFolder:ostris}/frontend" },
+        "problemMatcher": []
+      }
+    ]
+  }
+}
