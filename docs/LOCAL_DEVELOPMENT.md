@@ -14,13 +14,13 @@ github-public/
 
 ## Current capability boundary
 
-The current Shell source includes an executable Spring Boot backend and a Vite
-frontend build. The frontend is still the architecture-checkpoint page and the
-extension manifest is empty. Login, first-owner bootstrap, tenant, user, role
-and permission administration screens and the runtime loading of the Ledger and
-osTRIS frontend extensions are not implemented yet. The local stack is useful
-for source builds, database migrations, backend health checks and integration
-work; it is not yet a complete end-user application.
+The Shell includes its Spring Boot backend, public React frontend, local
+authentication, module navigation and a reusable administration workspace.
+Users, roles and alerts share the same CRUD, filtering and saved-filter
+components. **Explore the interface** runs these screens with ephemeral demo
+data. A real authenticated session uses only the versioned Shell API and shows
+a capability notice until the next compatible Core Runtime exposes the secure
+administration adapters; it never falls back to direct database access.
 
 ## Prerequisites
 
@@ -73,16 +73,69 @@ docker compose -f compose.local.yml ps
 ```
 
 The source-built Shell is exposed through Caddy at
-`http://localhost:8088`. Useful checks are:
+`http://localhost:8088`.
+
+For this local environment only, the Shell creates a demo tenant and owner:
+
+```text
+Email:    admin@local.test
+Password: IdaxLocal123!
+```
+
+Open the URL and use those credentials. They are deliberately predictable for
+the quick start and must never be enabled or reused in staging or production.
+The initializer is disabled by default in the application and is enabled only
+by `compose.local.yml`. To choose different local credentials before starting:
+
+```powershell
+$env:IDAX_LOCAL_DEMO_EMAIL = "me@example.test"
+$env:IDAX_LOCAL_DEMO_PASSWORD = "A-different-local-password"
+docker compose -f compose.local.yml up -d --build
+```
+
+Useful checks are:
 
 ```sh
 curl --fail http://localhost:8088/actuator/health/readiness
 curl --fail http://localhost:8088/
 ```
 
-The root page currently displays the Shell architecture checkpoint. A healthy
-page proves the backend-served frontend bundle is present; it does not prove
-that login or administration features exist.
+## OpenAPI / Swagger local
+
+The local Compose file publishes the module backends on the host for API
+exploration:
+
+| Service | Swagger UI | OpenAPI JSON |
+| --- | --- | --- |
+| Shell | `http://localhost:8088/swagger-ui/index.html` | `http://localhost:8088/v3/api-docs` |
+| IDAX Ledger | `http://localhost:8094/swagger-ui/index.html` | `http://localhost:8094/v3/api-docs` |
+| osTRIS | `http://localhost:8095/swagger-ui/index.html` | `http://localhost:8095/v3/api-docs` |
+
+Swagger UI and its OpenAPI document are deliberately public only in this local
+configuration. Business endpoints still require the bearer token issued by the
+Shell. Use the browser application to sign in first, then copy its access token
+from the browser developer tools and select **Authorize** in Swagger UI with
+`Bearer <token>`.
+
+The published `8094` and `8095` ports are for local development only; do not
+expose them in a production reverse proxy or firewall rule.
+
+Successful login opens the public Shell and its tenant context. The
+**Explore the interface** button remains available as a UI-only demonstration;
+use the credentials above when testing authentication.
+
+To test the frontend administration workflow without changing the database:
+
+1. Select **Explore the interface**.
+2. Open **Users**, **Roles** or **Alerts** from the resizable menu.
+3. Create, edit and delete demo records.
+4. Choose a field and value, save the filter, then restore or delete it from
+   the chips below the filter bar.
+5. From Users or Roles, select **Create alert** to move to the alert workspace.
+
+Demo records exist only in memory. Demo saved filters use browser local storage
+under `idax.demo.filters.*`; they are not sent to the backend. With a real
+session, saved filters and CRUD requests target `/api/shell/v1/tenants/{id}`.
 
 Inspect logs with:
 
@@ -102,8 +155,7 @@ discarding all local development data.
 
 ## Before calling the distribution complete
 
-Implement and verify the Shell authentication/bootstrap APIs, administration
-UI, extension manifest entries, frontend extension serving/loading, and
-service-to-service authentication. Then add an end-to-end test that logs in,
+Publish the compatible Core administration services and adapters, finish the
+extension manifest and service-to-service authentication, then add an end-to-end test that logs in,
 creates or selects a tenant, manages a user role, opens Ledger and osTRIS from
 the Shell navigation, and verifies tenant isolation.

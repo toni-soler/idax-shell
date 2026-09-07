@@ -1,5 +1,11 @@
 :8088 {
   encode zstd gzip
+  handle /extensions/ledger/* {
+    reverse_proxy ledger-ui:80
+  }
+  handle /extensions/ostris/* {
+    reverse_proxy ostris-ui:80
+  }
   handle /api/ledger/* {
     reverse_proxy ledger:8094
   }

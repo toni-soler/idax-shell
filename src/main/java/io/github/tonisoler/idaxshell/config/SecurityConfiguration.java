@@ -14,6 +14,8 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
@@ -28,11 +30,16 @@ public class SecurityConfiguration {
       .authorizeHttpRequests(a -> a
         .requestMatchers(
           "/", "/index.html", "/favicon.ico", "/assets/**",
-          "/actuator/health/**", "/api/shell/v1/bootstrap/status"
+          "/generated/**", "/logo-*.svg", "/actuator/health/**",
+          "/api/shell/v1/bootstrap/status", "/api/shell/v1/auth/login",
+          "/ledger", "/ledger/**", "/ostris", "/ostris/**", "/extensions/**",
+          "/swagger-ui/**", "/v3/api-docs/**"
         ).permitAll()
         .anyRequest().authenticated())
       .oauth2ResourceServer(o -> o.jwt(jwt -> {})).build();
   }
+
+  @Bean PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
 
   @Bean JwtEncoder jwtEncoder(ShellProperties properties) throws Exception {
     try (InputStream in = properties.jwt().privateKey().getInputStream(); InputStream publicIn = properties.jwt().publicKey().getInputStream()) {

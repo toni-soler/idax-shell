@@ -24,3 +24,10 @@ idax:
       access-token-ttl: ${JWT_ACCESS_TTL:PT15M}
     bootstrap-token-file: ${BOOTSTRAP_TOKEN_FILE:/run/secrets/bootstrap_token}
     extension-manifest: ${EXTENSION_MANIFEST:classpath:extensions.json}
+    local-demo:
+      enabled: ${IDAX_LOCAL_DEMO_ENABLED:false}
+      email: ${IDAX_LOCAL_DEMO_EMAIL:admin@local.test}
+      password: ${IDAX_LOCAL_DEMO_PASSWORD:IdaxLocal123!}
+      display-name: ${IDAX_LOCAL_DEMO_DISPLAY_NAME:Local Administrator}
+      tenant-code: ${IDAX_LOCAL_DEMO_TENANT_CODE:demo}
+      tenant-name: ${IDAX_LOCAL_DEMO_TENANT_NAME:IDAX Demo}
