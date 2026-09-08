@@ -60,7 +60,7 @@ Never commit these files or reuse them outside local development.
 In VS Code select **Terminal > Run Task** and run
 **Open Core: validate all sources**. This executes Maven verification and the
 frontend tests/builds for Shell, Ledger and osTRIS, followed by Compose schema
-validation. Maven resolves `es.idynamicsax.idax:idax-core:0.2.0` from the public
+validation. Maven resolves `es.idynamicsax.idax:idax-core:0.3.0` from the public
 GitHub Pages Maven repository.
 
 ## Start the local stack

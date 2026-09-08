@@ -4,13 +4,13 @@
 
 IDAX Shell is a deployable host and public integration surface. It contains
 only independently authored adapters, UI, deployment assets and documentation.
-It depends on `es.idynamicsax.idax:idax-core:0.2.0` as an unchanged binary and
+It depends on `es.idynamicsax.idax:idax-core:0.3.0` as an unchanged binary and
 on the public database migrations distributed by IDAX Core Runtime.
 
 It deliberately contains no application, API, frontend, legacy integration,
 generator or generated source from any non-public product.
 
-## Capability assessment for Core 0.2.0
+## Capability assessment for Core 0.3.0
 
 Evidence available from its published POM, migration contract and public module
 consumers shows that Core provides:
@@ -21,11 +21,14 @@ consumers shows that Core provides:
 - password, JWT, MFA, audit and permission services;
 - module permission-catalog parsing and registration;
 - public Java contracts already consumed by IDAX Ledger and osTRIS.
+- secure first-administrator bootstrap and hardened database identity capabilities.
 
 Core is intentionally not a runnable identity-provider application. The
-minimum missing product layer is an HTTP host, secure first-admin bootstrap,
-login/token orchestration, administrative endpoints, a browser UI and public
-extension discovery.
+minimum missing product layer is the reviewed HTTP adapter that binds these
+services to Shell authorization, plus production login/token orchestration.
+The browser administration UI and public extension discovery already live in
+Shell; until that adapter is bound, administration endpoints fail explicitly
+with `CORE_RUNTIME_UPGRADE_REQUIRED` and never fall back to independent SQL.
 
 ## Runtime topology
 

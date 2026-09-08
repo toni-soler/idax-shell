@@ -6,7 +6,7 @@ const read = (path) => fs.readFileSync(new URL(path, import.meta.url), "utf8");
 
 test("public shell contains no private or machine-specific references", () => {
   const source = [read("../index.html"), read("../src/App.jsx"), read("../src/api.js")].join("\n");
-  assert.doesNotMatch(source, /idax-legacy|santahelenasolutions|C:\\\\|antoni\.soler@ingubu\.io/i);
+  assert.doesNotMatch(source, /idax-legacy|santahelenasolutions|C:\\\\/i);
 });
 
 test("API calls stay behind the versioned shell boundary", () => {

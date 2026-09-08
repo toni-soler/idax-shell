@@ -4,7 +4,7 @@
   <parent><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId><version>3.4.4</version><relativePath/></parent>
   <groupId>io.github.toni-soler</groupId><artifactId>idax-shell</artifactId><version>0.1.0</version>
   <name>IDAX Shell</name><description>Public deployable host for IDAX Core modules</description>
-  <properties><java.version>21</java.version><idax-core.version>0.2.0</idax-core.version></properties>
+  <properties><java.version>21</java.version><idax-core.version>0.3.0</idax-core.version></properties>
   <repositories><repository><id>idax-public</id><url>https://toni-soler.github.io/idax-core-runtime/maven2</url></repository></repositories>
   <dependencies>
     <dependency><groupId>es.idynamicsax.idax</groupId><artifactId>idax-core</artifactId><version>${idax-core.version}</version></dependency>
