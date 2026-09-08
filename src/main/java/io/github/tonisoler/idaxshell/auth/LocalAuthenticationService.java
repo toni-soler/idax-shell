@@ -1,74 +1,111 @@
 package io.github.tonisoler.idaxshell.auth;
 
-import io.github.tonisoler.idaxshell.config.ShellProperties;
-import java.time.Instant;
+import es.idynamicsax.idax.domain.AppUser;
+import es.idynamicsax.idax.repository.AppUserRepository;
+import es.idynamicsax.idax.repository.TenantRepository;
+import es.idynamicsax.idax.repository.TenantUserRepository;
+import es.idynamicsax.idax.security.CurrentUser;
+import es.idynamicsax.idax.security.TokenValidator;
+import es.idynamicsax.idax.service.auth.LocalAuthService;
+import es.idynamicsax.idax.service.auth.LoginOutcome;
+import es.idynamicsax.idax.service.auth.MfaForcedSetupService;
+import es.idynamicsax.idax.service.auth.MfaLoginService;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
-import org.springframework.security.oauth2.jwt.JwtClaimsSet;
-import org.springframework.security.oauth2.jwt.JwtEncoder;
-import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
-import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.stereotype.Service;
 
+/** Public transport adapter over the Core LOCAL authentication contract. */
 @Service
 @ConditionalOnProperty(prefix = "idax.shell.local-demo", name = "enabled", havingValue = "true")
 public class LocalAuthenticationService {
-  private final JdbcTemplate jdbc;
-  private final PasswordEncoder passwords;
-  private final JwtEncoder encoder;
-  private final ShellProperties properties;
+  private final LocalAuthService coreAuthentication;
+  private final TokenValidator tokenValidator;
+  private final AppUserRepository users;
+  private final TenantUserRepository memberships;
+  private final TenantRepository tenants;
+  private final MfaLoginService mfaLogin;
+  private final MfaForcedSetupService forcedSetup;
 
-  public LocalAuthenticationService(JdbcTemplate jdbc, PasswordEncoder passwords,
-                                    JwtEncoder encoder, ShellProperties properties) {
-    this.jdbc = jdbc; this.passwords = passwords; this.encoder = encoder; this.properties = properties;
+  public LocalAuthenticationService(LocalAuthService coreAuthentication, TokenValidator tokenValidator,
+                                    AppUserRepository users, TenantUserRepository memberships,
+                                    TenantRepository tenants, MfaLoginService mfaLogin,
+                                    MfaForcedSetupService forcedSetup) {
+    this.coreAuthentication = coreAuthentication;
+    this.tokenValidator = tokenValidator;
+    this.users = users;
+    this.memberships = memberships;
+    this.tenants = tenants;
+    this.mfaLogin = mfaLogin;
+    this.forcedSetup = forcedSetup;
   }
 
-  public Session login(String email, String password) {
-    var users = jdbc.query("""
-        select u.user_id, u.email, u.display_name, u.is_superuser, c.password_hash
-          from idax_core.app_user u join idax_core.app_user_credential c on c.user_id=u.user_id
-         where lower(u.email)=lower(?) and u.auth_provider='local' and u.is_active=true
-        """, (rs, row) -> new UserRow(rs.getObject("user_id", UUID.class), rs.getString("email"),
-            rs.getString("display_name"), rs.getBoolean("is_superuser"), rs.getString("password_hash")), email);
-    if (users.size() != 1 || !passwords.matches(password, users.getFirst().passwordHash()))
-      throw new BadCredentialsException("Invalid credentials");
-    UserRow user = users.getFirst();
-    List<Tenant> tenants = tenants(user.id());
-    if (tenants.isEmpty()) throw new BadCredentialsException("User has no active workspace");
-    return issue(user, tenants);
+  public Object login(String email, String password) {
+    LoginOutcome outcome;
+    try {
+      outcome = coreAuthentication.login(email, password);
+    } catch (IllegalArgumentException exception) {
+      throw new BadCredentialsException("Invalid credentials", exception);
+    }
+    return switch (outcome) {
+      case LoginOutcome.Success success -> sessionFrom(success.response());
+      case LoginOutcome.MfaRequired required -> new MfaRequired("MFA_REQUIRED", required.challengeToken());
+      case LoginOutcome.MfaSetupRequired required -> new MfaSetupRequired("MFA_SETUP_REQUIRED", required.setupToken());
+    };
   }
 
-  public Session issue(UserRow user, List<Tenant> tenants) {
-    Instant now = Instant.now();
-    Tenant active = tenants.getFirst();
-    JwtClaimsSet claims = JwtClaimsSet.builder().issuer(properties.jwt().issuer())
-        .issuedAt(now).expiresAt(now.plus(properties.jwt().accessTokenTtl()))
-        .subject(user.id().toString()).claim("userId", user.id().toString())
-        .claim("tenantId", active.id().toString()).claim("roles", List.of("owner"))
-        .claim("superuser", user.superuser()).claim("email", user.email())
-        .claim("displayName", user.displayName()).build();
-    String token = encoder.encode(JwtEncoderParameters.from(
-        JwsHeader.with(SignatureAlgorithm.RS256).keyId("idax-shell").build(), claims)).getTokenValue();
-    return new Session(token, new User(user.id(), user.email(), user.displayName(), user.superuser()), tenants);
+  public Session session(CurrentUser currentUser) {
+    if (currentUser == null || currentUser.isService() || currentUser.getUserId() == null) {
+      throw new BadCredentialsException("A validated user identity is required");
+    }
+    AppUser user = users.findById(currentUser.getUserId())
+        .orElseThrow(() -> new BadCredentialsException("Authenticated user no longer exists"));
+    return new Session(null, null, currentUser.getRoles().stream().sorted().toList(),
+        toUser(user), tenantViews(user.getId()));
   }
 
-  public List<Tenant> tenants(UUID userId) {
-    return jdbc.query("""
-        select t.tenant_id, t.code, t.name from idax_core.tenant t
-        join idax_core.tenant_user tu on tu.tenant_id=t.tenant_id
-        where tu.user_id=? and t.status='active' order by t.name
-        """, (rs, row) -> new Tenant(rs.getObject("tenant_id", UUID.class), rs.getString("code"), rs.getString("name")), userId);
+  public Session verifyMfa(String challengeToken, String code) {
+    return sessionFrom(mfaLogin.verify(challengeToken, code));
   }
 
-  record UserRow(UUID id, String email, String displayName, boolean superuser, String passwordHash) {}
-  public record LoginRequest(String email, String password) {}
+  public Object startForcedSetup(String setupToken) { return forcedSetup.start(setupToken); }
+
+  public ForcedSetupActivation activateForcedSetup(String setupToken, String code) {
+    var result = forcedSetup.activate(setupToken, code);
+    return new ForcedSetupActivation(result.recoveryCodes().codes(),
+        result.recoveryCodes().generatedAt(), sessionFrom(result.tokens()));
+  }
+
+  private Session sessionFrom(LocalAuthService.LoginResponse tokens) {
+    var validation = tokenValidator.validateAndExtract(tokens.accessToken());
+    if (!validation.isValid() || validation.getCurrentUser() == null) {
+      throw new IllegalStateException("Core issued an access token that its validator rejected");
+    }
+    CurrentUser currentUser = validation.getCurrentUser();
+    AppUser user = users.findById(currentUser.getUserId())
+        .orElseThrow(() -> new IllegalStateException("Core issued a token for an unknown user"));
+    return new Session(tokens.accessToken(), tokens.refreshToken(), tokens.roles(),
+        toUser(user), tenantViews(user.getId()));
+  }
+
+  private List<TenantView> tenantViews(UUID userId) {
+    return tenants.findAllById(memberships.findTenantIdsByUserId(userId)).stream()
+        .filter(tenant -> "active".equalsIgnoreCase(tenant.getStatus()))
+        .map(tenant -> new TenantView(tenant.getId(), tenant.getCode(), tenant.getName()))
+        .sorted(java.util.Comparator.comparing(TenantView::name))
+        .toList();
+  }
+
+  private User toUser(AppUser user) {
+    return new User(user.getId(), user.getEmail(), user.getDisplayName(), Boolean.TRUE.equals(user.getIsSuperuser()));
+  }
+
   public record User(UUID id, String email, String displayName, boolean superuser) {}
-  public record Tenant(UUID id, String code, String name) {}
-  public record Session(String accessToken, User user, List<Tenant> tenants) {}
+  public record TenantView(UUID id, String code, String name) {}
+  public record Session(String accessToken, String refreshToken, List<String> roles, User user, List<TenantView> tenants) {}
+  public record MfaRequired(String status, String challengeToken) {}
+  public record MfaSetupRequired(String status, String setupToken) {}
+  public record ForcedSetupActivation(List<String> recoveryCodes,
+      java.time.OffsetDateTime generatedAt, Session session) {}
 }

@@ -11,17 +11,11 @@ spring:
     schemas: idax_shell
     table: flyway_schema_history_idax_shell
     create-schemas: true
-  security.oauth2.resourceserver.jwt.public-key-location: ${JWT_PUBLIC_KEY:file:/run/secrets/jwt_public_key}
 management.endpoints.web.exposure.include: health,info
 management.endpoint.health.probes.enabled: true
 server.forward-headers-strategy: framework
 idax:
   shell:
-    jwt:
-      private-key: ${JWT_PRIVATE_KEY:file:/run/secrets/jwt_private_key}
-      public-key: ${JWT_PUBLIC_KEY:file:/run/secrets/jwt_public_key}
-      issuer: ${JWT_ISSUER:https://localhost}
-      access-token-ttl: ${JWT_ACCESS_TTL:PT15M}
     bootstrap-token-file: ${BOOTSTRAP_TOKEN_FILE:/run/secrets/bootstrap_token}
     extension-manifest: ${EXTENSION_MANIFEST:classpath:extensions.json}
     local-demo:
@@ -31,3 +25,13 @@ idax:
       display-name: ${IDAX_LOCAL_DEMO_DISPLAY_NAME:Local Administrator}
       tenant-code: ${IDAX_LOCAL_DEMO_TENANT_CODE:demo}
       tenant-name: ${IDAX_LOCAL_DEMO_TENANT_NAME:IDAX Demo}
+  auth:
+    mode: ${IDAX_AUTH_MODE:LOCAL}
+    token-validator: ${IDAX_AUTH_TOKEN_VALIDATOR:local}
+    local:
+      public-key-location: ${JWT_PUBLIC_KEY:file:/run/secrets/jwt_public_key}
+      private-key-location: ${JWT_PRIVATE_KEY:file:/run/secrets/jwt_private_key}
+  admin:
+    user: ${IDAX_LOCAL_DEMO_EMAIL:admin@local.test}
+    pass: ${IDAX_LOCAL_DEMO_PASSWORD:IdaxLocal123!}
+  break-glass.legacy-runtime-sync.enabled: false
