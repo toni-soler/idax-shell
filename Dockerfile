@@ -7,10 +7,11 @@ COPY brand/idax ./public
 RUN npm run build
 
 FROM maven:3.9.9-eclipse-temurin-21 AS backend
+ARG IDAX_CORE_REPOSITORY_URL=https://toni-soler.github.io/idax-core-runtime/maven2
 WORKDIR /src
 COPY pom.xml ./
 COPY src ./src
-RUN --mount=type=cache,target=/root/.m2 mvn -B package -DskipTests
+RUN --mount=type=cache,target=/root/.m2 mvn -B package -DskipTests -Didax-core.repository.url="$IDAX_CORE_REPOSITORY_URL"
 
 FROM eclipse-temurin:21-jre-alpine
 RUN addgroup -S idax && adduser -S -G idax -u 10001 idax

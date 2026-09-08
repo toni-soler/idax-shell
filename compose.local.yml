@@ -35,7 +35,10 @@ services:
     networks: [data]
 
   shell:
-    build: .
+    build:
+      context: .
+      args:
+        IDAX_CORE_REPOSITORY_URL: ${IDAX_CORE_REPOSITORY_URL:-https://toni-soler.github.io/idax-core-runtime/maven2}
     environment:
       DATABASE_URL: jdbc:postgresql://postgres:5432/idax
       DATABASE_USER: idax_admin

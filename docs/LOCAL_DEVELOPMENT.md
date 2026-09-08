@@ -18,9 +18,9 @@ The Shell includes its Spring Boot backend, public React frontend, local
 authentication, module navigation and a reusable administration workspace.
 Users, roles and alerts share the same CRUD, filtering and saved-filter
 components. **Explore the interface** runs these screens with ephemeral demo
-data. A real authenticated session uses only the versioned Shell API and shows
-a capability notice until the next compatible Core Runtime exposes the secure
-administration adapters; it never falls back to direct database access.
+data. A real authenticated session uses Core's validated `CurrentUser`, tenant
+context, permission checks, JPA services and PostgreSQL RLS. The Shell adapters
+do not query domain tables or maintain a second CRUD implementation.
 
 ## Prerequisites
 
@@ -136,6 +136,13 @@ To test the frontend administration workflow without changing the database:
 Demo records exist only in memory. Demo saved filters use browser local storage
 under `idax.demo.filters.*`; they are not sent to the backend. With a real
 session, saved filters and CRUD requests target `/api/shell/v1/tenants/{id}`.
+The Roles editor loads the Core permission catalog. Saved-filter alerts and
+configured alert definitions deliberately remain separate API contracts:
+
+```text
+/api/shell/v1/tenants/{id}/alerts       saved-filter alert requests
+/api/shell/v1/tenants/{id}/core-alerts configured alert definitions
+```
 
 Inspect logs with:
 
@@ -155,7 +162,8 @@ discarding all local development data.
 
 ## Before calling the distribution complete
 
-Publish the compatible Core administration services and adapters, finish the
-extension manifest and service-to-service authentication, then add an end-to-end test that logs in,
-creates or selects a tenant, manages a user role, opens Ledger and osTRIS from
-the Shell navigation, and verifies tenant isolation.
+Before publishing a Core increment, run the complete source validation and a
+real PostgreSQL exercise that logs in, selects a tenant, lists users and roles,
+loads the permission catalog, saves a filter, creates an alert, and proves that
+the same non-superuser identity is rejected for a different tenant. Keep the
+candidate unpublished if any step fails.
