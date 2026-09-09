@@ -2,7 +2,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId><version>3.4.4</version><relativePath/></parent>
-  <groupId>io.github.toni-soler</groupId><artifactId>idax-shell</artifactId><version>0.1.0</version>
+  <groupId>io.github.toni-soler</groupId><artifactId>idax-shell</artifactId><version>0.3.0</version>
   <name>IDAX Shell</name><description>Public deployable host for IDAX Core modules</description>
   <properties><java.version>21</java.version><idax-core.version>0.3.0</idax-core.version><idax-core.repository.url>https://toni-soler.github.io/idax-core-runtime/maven2</idax-core.repository.url></properties>
   <repositories><repository><id>idax-public</id><url>${idax-core.repository.url}</url></repository></repositories>
