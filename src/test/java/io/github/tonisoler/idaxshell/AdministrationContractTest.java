@@ -32,6 +32,8 @@ class AdministrationContractTest {
     assertTrue(administration.contains("RolePermissionService"));
     assertTrue(administration.contains("UserPreferencesService"));
     assertTrue(administration.contains("SavedFilterAlertService"));
+    assertTrue(administration.contains("result.put(\"filters\", filter.filters())"));
+    assertTrue(administration.contains("node.get(\"filters\").fields()"));
     assertTrue(administration.contains("system.users.read"));
     assertTrue(administration.contains("system.roles.manage"));
     assertTrue(security.contains("JwtAuthFilter"));

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="160" viewBox="0 0 640 160" role="img" aria-labelledby="title">
+  <title id="title">IDAX</title>
+  <g transform="translate(8 8) scale(.28125)">
+    <rect width="512" height="512" rx="128" fill="#07111E"/>
+    <circle cx="128" cy="138" r="36" fill="#55E6D1"/>
+    <rect x="98" y="198" width="60" height="188" rx="12" fill="#55E6D1"/>
+    <path d="M222 126v260" stroke="#DCEAF6" stroke-width="12" stroke-linecap="round" opacity=".8"/>
+    <path d="M274 386 352 190h42l78 196h-48l-18-48h-72l-18 48Zm76-90h42l-21-60Z" fill="#55E6D1"/>
+    <path d="m404 190 36 60 36-60h50l-62 96 66 100h-54l-38-62-38 62h-51l65-100-62-96Z" fill="#55E6D1" transform="translate(-35)"/>
+  </g>
+  <text x="178" y="101" fill="#FFFFFF" font-family="Manrope,Arial,sans-serif" font-size="76" font-weight="700" letter-spacing="-3">IDAX</text>
+</svg>

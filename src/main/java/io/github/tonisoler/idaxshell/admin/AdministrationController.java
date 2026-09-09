@@ -188,6 +188,10 @@ public class AdministrationController {
     String name = text(node, "name", "description");
     String field = text(node, "field");
     Map<String, Object> values = new LinkedHashMap<>();
+    if (node.has("filters") && node.get("filters").isObject()) {
+      node.get("filters").fields().forEachRemaining(entry ->
+          values.put(entry.getKey(), mapper.convertValue(entry.getValue(), Object.class)));
+    }
     if (field != null) values.put(field, mapper.convertValue(node.get("value"), Object.class));
     return new UserSavedFilter(id, name, values, Map.of(), null, null, null);
   }
@@ -196,6 +200,7 @@ public class AdministrationController {
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("id", filter.id()); result.put("name", filter.description());
     if (filter.filters() != null && !filter.filters().isEmpty()) {
+      result.put("filters", filter.filters());
       var entry = filter.filters().entrySet().iterator().next();
       result.put("field", entry.getKey()); result.put("value", entry.getValue());
     }

@@ -27,6 +27,9 @@ test("administration reuses one generic CRUD workspace and versioned APIs", () =
   assert.match(app, /\["alerts","!"\]/);
   assert.match(crud, /const definitions = \{[\s\S]*users:[\s\S]*roles:[\s\S]*alerts:/);
   assert.match(crud, /savedFilters/);
+  assert.match(crud, /filter\.criteria\.every/);
+  assert.match(crud, /filters: values/);
+  assert.match(crud, /Object\.entries\(filters\)/);
   assert.match(crud, /kind === "users" && field\.key === "role"/);
   assert.match(crud, /next\.subject = next\.subject \|\| next\.email/);
   assert.match(crud, /setError\(""\); setEditing\(null\); setCreating\(null\)/);
