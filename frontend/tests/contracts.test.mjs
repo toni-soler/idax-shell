@@ -27,6 +27,11 @@ test("administration reuses one generic CRUD workspace and versioned APIs", () =
   assert.match(app, /\["alerts","!"\]/);
   assert.match(crud, /const definitions = \{[\s\S]*users:[\s\S]*roles:[\s\S]*alerts:/);
   assert.match(crud, /savedFilters/);
+  assert.match(crud, /kind === "users" && field\.key === "role"/);
+  assert.match(crud, /next\.subject = next\.subject \|\| next\.email/);
+  assert.match(crud, /setError\(""\); setEditing\(null\); setCreating\(null\)/);
+  assert.match(crud, /aria-label=\{t\("crud\.cancel"\)\}/);
   assert.match(api, /\/api\/shell\/v1\/tenants\/\$\{encodeURIComponent\(tenantId\)\}\/alerts/);
+  assert.match(api, /details\?\.message/);
   assert.doesNotMatch(crud, /idax_core|JdbcTemplate|\/api\/legacy/i);
 });

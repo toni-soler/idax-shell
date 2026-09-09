@@ -8,7 +8,13 @@ async function request(path, options = {}) {
     credentials: "include",
     headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers },
   });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  if (!response.ok) {
+    const contentType = response.headers.get("content-type") || "";
+    const details = contentType.includes("application/json")
+      ? await response.json().catch(() => null)
+      : null;
+    throw new Error(details?.message || `HTTP ${response.status}`);
+  }
   return response.status === 204 ? null : response.json();
 }
 

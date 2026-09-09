@@ -51,6 +51,14 @@ public class LocalDemoInitializer implements ApplicationRunner {
         LocalIdentitySubjectPolicy.BREAK_GLASS_SUBJECT);
     jdbc.queryForObject("select set_config('app.tenant_id', ?, true)", String.class, TENANT_ID.toString());
     jdbc.update("""
+        delete from idax_core.tenant_user
+         where tenant_id=?
+           and user_id in (
+             select user_id from idax_core.app_user
+              where external_subject='local:admin' and email=?
+           )
+        """, TENANT_ID, demo.email());
+    jdbc.update("""
         insert into idax_core.tenant_user(tenant_id, user_id, role)
         values (?, ?, 'owner')
         on conflict (tenant_id, user_id) do update set role='owner'
