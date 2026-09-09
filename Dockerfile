@@ -8,10 +8,13 @@ RUN npm run build
 
 FROM maven:3.9.9-eclipse-temurin-21 AS backend
 ARG IDAX_CORE_REPOSITORY_URL=https://toni-soler.github.io/idax-core-runtime/maven2
+ENV IDAX_CORE_REPOSITORY_URL=$IDAX_CORE_REPOSITORY_URL
 WORKDIR /src
 COPY pom.xml ./
+COPY .mvn/docker-local-settings.xml ./.mvn/docker-local-settings.xml
 COPY src ./src
-RUN --mount=type=cache,target=/root/.m2 mvn -B package -DskipTests -Didax-core.repository.url="$IDAX_CORE_REPOSITORY_URL"
+RUN --mount=type=cache,target=/root/.m2 rm -rf /root/.m2/repository/es/idynamicsax/idax/idax-core/0.3.0 \
+    && mvn -B -U -s .mvn/docker-local-settings.xml package -DskipTests -Didax-core.repository.url="$IDAX_CORE_REPOSITORY_URL"
 
 FROM eclipse-temurin:21-jre-alpine
 RUN addgroup -S idax && adduser -S -G idax -u 10001 idax

@@ -38,7 +38,7 @@ services:
     build:
       context: .
       args:
-        IDAX_CORE_REPOSITORY_URL: ${IDAX_CORE_REPOSITORY_URL:-https://toni-soler.github.io/idax-core-runtime/maven2}
+        IDAX_CORE_REPOSITORY_URL: http://host.docker.internal:8766/maven2
     environment:
       DATABASE_URL: jdbc:postgresql://postgres:5432/idax
       DATABASE_USER: idax_admin
@@ -57,7 +57,10 @@ services:
       retries: 30
 
   ledger:
-    build: ../idax-ledger/backend
+    build:
+      context: ../idax-ledger/backend
+      args:
+        IDAX_CORE_REPOSITORY_URL: http://host.docker.internal:8766/maven2
     ports: ["8094:8094"]
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/idax
@@ -76,7 +79,10 @@ services:
     networks: [edge]
 
   ostris:
-    build: ../ostris/backend
+    build:
+      context: ../ostris/backend
+      args:
+        IDAX_CORE_REPOSITORY_URL: http://host.docker.internal:8766/maven2
     ports: ["8095:8095"]
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/idax

@@ -51,7 +51,10 @@ On Linux or macOS:
 
 The scripts are idempotent and preserve existing secret files. They also repair
 empty directories that Docker Desktop may create when a missing bind-mounted
-secret path is referenced too early.
+secret path is referenced too early. Before Core 0.3 is published, the script
+exports its Maven repository from the sibling `idax-core-runtime` local
+`gh-pages` branch and exposes it to Docker builds on local port `8766`. Nothing
+is pushed or published by this operation.
 
 Never commit these files or reuse them outside local development.
 
@@ -155,6 +158,7 @@ Stop the environment without deleting its database using the VS Code task
 
 ```sh
 docker compose -f compose.local.yml down
+docker rm -f idax-open-core-local-maven
 ```
 
 Only use `docker compose -f compose.local.yml down --volumes` when intentionally

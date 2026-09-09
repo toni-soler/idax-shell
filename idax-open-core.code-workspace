@@ -72,7 +72,8 @@
       {
         "label": "Open Core: stop local stack",
         "type": "shell",
-        "command": "docker compose -f compose.local.yml down",
+        "command": "docker compose -f compose.local.yml down && (docker rm -f idax-open-core-local-maven >/dev/null 2>&1 || true)",
+        "windows": { "command": "docker compose -f compose.local.yml down; $composeExit = $LASTEXITCODE; docker rm -f idax-open-core-local-maven 2>$null | Out-Null; if ($composeExit -ne 0) { exit $composeExit }" },
         "options": { "cwd": "${workspaceFolder:idax-shell}" },
         "problemMatcher": []
       },
