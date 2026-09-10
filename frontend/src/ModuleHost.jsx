@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { installModuleSdk, loadModuleExtension } from "./moduleSdk.js";
 
 export default function ModuleHost({ moduleKey, session, locale, onBack }) {
+  installModuleSdk(session, locale);
   const [Component, setComponent] = useState(() => window.__IDAX_MODULE_EXTENSIONS__?.[moduleKey]?.component || null);
   const [error, setError] = useState(null);
   useEffect(() => { installModuleSdk(session, locale); loadModuleExtension(moduleKey).then((loaded) => setComponent(() => loaded)).catch(setError); }, [moduleKey, session, locale]);

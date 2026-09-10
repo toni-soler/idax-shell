@@ -38,3 +38,6 @@ test("administration reuses one generic CRUD workspace and versioned APIs", () =
   assert.match(api, /details\?\.message/);
   assert.doesNotMatch(crud, /idax_core|JdbcTemplate|\/api\/legacy/i);
 });
+
+import {matchExtension} from "../src/extensionRoutes.js";
+test("module matching uses manifest route, not id or substring",()=>{const modules=[{id:"orchard",route:"/community/garden"}];assert.equal(matchExtension(modules,"/community/garden/new").id,"orchard");assert.equal(matchExtension(modules,"/community/gardening"),undefined);assert.equal(matchExtension(modules,"/orchard"),undefined);});

@@ -10,7 +10,7 @@ const read = (object, key) => key.split(".").reduce((value, part) => value?.[par
 
 export function installModuleSdk(session, locale) {
   window.__IDAX_MODULE_SDK__ = {
-    React, router,
+    React, router, activeTenantId: session.activeTenantId, user: session.user, demo: Boolean(session.demo),
     i18n: { addResourceBundle(language, _namespace, bundle) { resources[language] ||= {}; merge(resources[language], bundle); }, t(key, fallback) { return read(resources[locale], key) ?? read(resources.en, key) ?? fallback ?? key; } },
     fetchWithAuth(path, options = {}) { const token = sessionStorage.getItem("idax.accessToken"); return fetch(path, { ...options, credentials: "include", headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers } }); },
     useAuth() { const permissions = new Set(session.user?.permissions || []); return { isSuperuser: Boolean(session.user?.superuser), hasPermission: (permission) => permissions.has(permission) }; },

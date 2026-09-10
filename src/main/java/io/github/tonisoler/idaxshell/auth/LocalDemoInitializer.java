@@ -15,7 +15,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Component
 @ConditionalOnProperty(prefix = "idax.shell.local-demo", name = "enabled", havingValue = "true")
 public class LocalDemoInitializer implements ApplicationRunner {
-  static final UUID TENANT_ID = UUID.fromString("018f6f9a-7b1c-7a2b-8c3d-4e5f60719001");
   private final JdbcTemplate jdbc;
   private final BreakGlassIdentityService breakGlassIdentity;
   private final TransactionTemplate transaction;
@@ -36,11 +35,10 @@ public class LocalDemoInitializer implements ApplicationRunner {
   }
 
   private void initializeWorkspace() {
-    jdbc.update("""
-        insert into idax_core.tenant(tenant_id, code, name, status)
-        values (?, ?, ?, 'active')
-        on conflict (code) do update set name=excluded.name, status='active'
-        """, TENANT_ID, demo.tenantCode(), demo.tenantName());
+    var existing = jdbc.queryForList("select tenant_id from idax_core.tenant where code=?", UUID.class, demo.tenantCode());
+    UUID tenantId = existing.isEmpty()
+        ? jdbc.queryForObject("select tenant_id from idax_core.tenant_create(?, ?, 'active', false)", UUID.class, demo.tenantCode(), demo.tenantName())
+        : existing.getFirst();
     jdbc.update("""
         update idax_core.app_user
            set email=?, display_name=?, auth_provider='local', is_active=true, is_superuser=true
@@ -49,7 +47,7 @@ public class LocalDemoInitializer implements ApplicationRunner {
     UUID userId = jdbc.queryForObject(
         "select user_id from idax_core.app_user where external_subject=?", UUID.class,
         LocalIdentitySubjectPolicy.BREAK_GLASS_SUBJECT);
-    jdbc.queryForObject("select set_config('app.tenant_id', ?, true)", String.class, TENANT_ID.toString());
+    jdbc.queryForObject("select set_config('app.tenant_id', ?, true)", String.class, tenantId.toString());
     jdbc.update("""
         delete from idax_core.tenant_user
          where tenant_id=?
@@ -57,11 +55,11 @@ public class LocalDemoInitializer implements ApplicationRunner {
              select user_id from idax_core.app_user
               where external_subject='local:admin' and email=?
            )
-        """, TENANT_ID, demo.email());
+        """, tenantId, demo.email());
     jdbc.update("""
         insert into idax_core.tenant_user(tenant_id, user_id, role)
         values (?, ?, 'owner')
         on conflict (tenant_id, user_id) do update set role='owner'
-        """, TENANT_ID, userId);
+        """, tenantId, userId);
   }
 }
