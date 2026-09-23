@@ -10,7 +10,9 @@ import es.idynamicsax.idax.service.auth.LocalAuthService;
 import es.idynamicsax.idax.service.auth.LoginOutcome;
 import es.idynamicsax.idax.service.auth.MfaForcedSetupService;
 import es.idynamicsax.idax.service.auth.MfaLoginService;
+import es.idynamicsax.idax.service.permission.PermissionService;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -27,11 +29,12 @@ public class LocalAuthenticationService {
   private final TenantRepository tenants;
   private final MfaLoginService mfaLogin;
   private final MfaForcedSetupService forcedSetup;
+  private final PermissionService permissions;
 
   public LocalAuthenticationService(LocalAuthService coreAuthentication, TokenValidator tokenValidator,
                                     AppUserRepository users, TenantUserRepository memberships,
                                     TenantRepository tenants, MfaLoginService mfaLogin,
-                                    MfaForcedSetupService forcedSetup) {
+                                    MfaForcedSetupService forcedSetup, PermissionService permissions) {
     this.coreAuthentication = coreAuthentication;
     this.tokenValidator = tokenValidator;
     this.users = users;
@@ -39,6 +42,7 @@ public class LocalAuthenticationService {
     this.tenants = tenants;
     this.mfaLogin = mfaLogin;
     this.forcedSetup = forcedSetup;
+    this.permissions = permissions;
   }
 
   public Object login(String email, String password) {
@@ -62,7 +66,7 @@ public class LocalAuthenticationService {
     AppUser user = users.findById(currentUser.getUserId())
         .orElseThrow(() -> new BadCredentialsException("Authenticated user no longer exists"));
     return new Session(null, null, currentUser.getRoles().stream().sorted().toList(),
-        toUser(user), tenantViews(user.getId()));
+        toUser(user, currentUser), tenantViews(user.getId()));
   }
 
   public Session verifyMfa(String challengeToken, String code) {
@@ -86,7 +90,7 @@ public class LocalAuthenticationService {
     AppUser user = users.findById(currentUser.getUserId())
         .orElseThrow(() -> new IllegalStateException("Core issued a token for an unknown user"));
     return new Session(tokens.accessToken(), tokens.refreshToken(), tokens.roles(),
-        toUser(user), tenantViews(user.getId()));
+        toUser(user, currentUser), tenantViews(user.getId()));
   }
 
   private List<TenantView> tenantViews(UUID userId) {
@@ -97,11 +101,19 @@ public class LocalAuthenticationService {
         .toList();
   }
 
-  private User toUser(AppUser user) {
-    return new User(user.getId(), user.getEmail(), user.getDisplayName(), Boolean.TRUE.equals(user.getIsSuperuser()));
+  /** effectivePermissions() is Core's own authoritative computation for this user in their
+   * CURRENT token's tenant (the same one every "@permissionService.hasPermission(...)" backend
+   * check already relies on) - module-defined permission codes (e.g. a STIR extension's
+   * "stir.moderation.manage") included, not just a fixed platform set. Without this, a module
+   * extension's frontend has no accurate client-side signal at all for "can this user do X",
+   * since the JWT itself carries no permission claims - only role names and the tenant id. */
+  private User toUser(AppUser user, CurrentUser currentUser) {
+    Set<String> effective = permissions.effectivePermissions(currentUser);
+    return new User(user.getId(), user.getEmail(), user.getDisplayName(), Boolean.TRUE.equals(user.getIsSuperuser()),
+        List.copyOf(effective));
   }
 
-  public record User(UUID id, String email, String displayName, boolean superuser) {}
+  public record User(UUID id, String email, String displayName, boolean superuser, List<String> permissions) {}
   public record TenantView(UUID id, String code, String name) {}
   public record Session(String accessToken, String refreshToken, List<String> roles, User user, List<TenantView> tenants) {}
   public record MfaRequired(String status, String challengeToken) {}
