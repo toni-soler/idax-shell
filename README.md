@@ -17,8 +17,8 @@ legacy integration or generator source.
 Read [ARCHITECTURE.md](ARCHITECTURE.md), the
 [capability reuse matrix](docs/CAPABILITY_REUSE_MATRIX.md) and the
 [open-core boundary](docs/OPEN_CORE_BOUNDARIES.md) before contributing. Version
-0.3.0 is the first complete local-development preview with the Shell, Core,
-Ledger and osTRIS composed behind one frontend.
+0.4.0 builds on the first complete local-development preview with effective
+permission visibility and manifest-driven third-party module extensions.
 
 To open all public repositories together and exercise the current source-built
 local stack, follow the [VS Code local development quick steps](docs/LOCAL_DEVELOPMENT.md).
