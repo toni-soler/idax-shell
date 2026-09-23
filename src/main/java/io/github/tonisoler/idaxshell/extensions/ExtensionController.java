@@ -8,12 +8,10 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController @RequestMapping("/api/shell/v1/extensions")
 public class ExtensionController {
-  private final ObjectMapper mapper; private final ShellProperties properties;
-  public ExtensionController(ObjectMapper mapper,ShellProperties properties){this.mapper=mapper;this.properties=properties;}
+  private final ExtensionRegistry registry;
+  public ExtensionController(ExtensionRegistry registry){this.registry=registry;}
   @GetMapping public JsonNode manifest() throws IOException {
-    JsonNode root=mapper.readTree(properties.extensionManifest().getInputStream());
-    if(root.path("schemaVersion").asInt()!=1 || !root.path("extensions").isArray()) throw new IllegalStateException("Unsupported extension manifest");
-    return root;
+    return registry.manifest();
   }
 }
 

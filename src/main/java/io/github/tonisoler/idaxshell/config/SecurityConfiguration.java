@@ -19,14 +19,16 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableMethodSecurity
 public class SecurityConfiguration {
   @Bean SecurityFilterChain security(HttpSecurity http, JwtAuthFilter jwtAuthFilter,
-      TenantContextFilter tenantContextFilter, PermissionAuthorizationFilter permissionFilter) throws Exception {
+      TenantContextFilter tenantContextFilter, PermissionAuthorizationFilter permissionFilter,
+      io.github.tonisoler.idaxshell.extensions.ExtensionRegistry extensions) throws Exception {
     return http.csrf(csrf -> csrf.disable())
       .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
       .authorizeHttpRequests(a -> a
         .requestMatchers("/", "/index.html", "/favicon.ico", "/assets/**", "/generated/**",
           "/logo-*.svg", "/actuator/health/**", "/api/shell/v1/bootstrap/status",
-          "/api/shell/v1/auth/**", "/ledger", "/ledger/**", "/ostris", "/ostris/**",
+          "/api/shell/v1/auth/**",
           "/extensions/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+        .requestMatchers(extensions::isSpaRequest).permitAll()
         .anyRequest().authenticated())
       .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
       .addFilterAfter(tenantContextFilter, JwtAuthFilter.class)
