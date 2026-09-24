@@ -12,7 +12,11 @@ export function installModuleSdk(session, locale) {
   window.__IDAX_MODULE_SDK__ = {
     React, router, activeTenantId: session.activeTenantId, user: session.user, demo: Boolean(session.demo),
     i18n: { addResourceBundle(language, _namespace, bundle) { resources[language] ||= {}; merge(resources[language], bundle); }, t(key, fallback) { return read(resources[locale], key) ?? read(resources.en, key) ?? fallback ?? key; } },
-    fetchWithAuth(path, options = {}) { const token = sessionStorage.getItem("idax.accessToken"); return fetch(path, { ...options, credentials: "include", headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers } }); },
+    // Shell's own CrudWorkspace embeds the active tenant in the URL path; module extensions
+    // (Ledger, osTRIS) instead read it from this X-Tenant header - without it, a module backend
+    // that requires an explicit tenant (e.g. Ledger's Proofs) falls back to the JWT's own tenant
+    // claim, which is absent for this session's admin identity, and rejects the request.
+    fetchWithAuth(path, options = {}) { const token = sessionStorage.getItem("idax.accessToken"); return fetch(path, { ...options, credentials: "include", headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(session.activeTenantId ? { "X-Tenant": session.activeTenantId } : {}), ...options.headers } }); },
     useAuth() { const permissions = new Set(session.user?.permissions || []); return { isSuperuser: Boolean(session.user?.superuser), hasPermission: (permission) => permissions.has(permission) }; },
   };
 }

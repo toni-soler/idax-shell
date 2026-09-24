@@ -41,3 +41,9 @@ test("administration reuses one generic CRUD workspace and versioned APIs", () =
 
 import {matchExtension} from "../src/extensionRoutes.js";
 test("module matching uses manifest route, not id or substring",()=>{const modules=[{id:"orchard",route:"/community/garden"}];assert.equal(matchExtension(modules,"/community/garden/new").id,"orchard");assert.equal(matchExtension(modules,"/community/gardening"),undefined);assert.equal(matchExtension(modules,"/orchard"),undefined);});
+
+test("module extensions receive the active tenant as a header, not just on the SDK object",()=>{
+  const sdk = read("../src/moduleSdk.js");
+  assert.match(sdk, /activeTenantId: session\.activeTenantId/);
+  assert.match(sdk, /"X-Tenant":\s*session\.activeTenantId/);
+});
