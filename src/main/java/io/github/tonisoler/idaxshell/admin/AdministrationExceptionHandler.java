@@ -5,7 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice(assignableTypes = AdministrationController.class)
+@RestControllerAdvice(assignableTypes = {AdministrationController.class, TenantAdminController.class})
 public class AdministrationExceptionHandler {
   @ExceptionHandler(IllegalArgumentException.class)
   ResponseEntity<Map<String, String>> invalid(IllegalArgumentException exception) {

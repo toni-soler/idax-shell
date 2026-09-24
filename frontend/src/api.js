@@ -53,5 +53,11 @@ export const shellApi = {
   runAlert: (tenantId, alertId) => request(`/api/shell/v1/tenants/${encodeURIComponent(tenantId)}/alerts/${encodeURIComponent(alertId)}/run-now`, { method: "POST" }),
   alertDefinitions: (tenantId) => request(`/api/shell/v1/tenants/${encodeURIComponent(tenantId)}/core-alerts`),
   savedFilters: (tenantId, resource) => request(`/api/shell/v1/tenants/${encodeURIComponent(tenantId)}/saved-filters/${encodeURIComponent(resource)}`),
+  // Platform-level, not scoped to any single tenantId - creating a tenant needs no existing
+  // tenant context, and only a platform superuser may call these (see TenantAdminController).
+  platformTenants: () => request("/api/shell/v1/platform/tenants"),
+  createPlatformTenant: (body) => request("/api/shell/v1/platform/tenants", { method: "POST", body: JSON.stringify(body) }),
+  setTenantEnabled: (tenantId, enabled) => request(`/api/shell/v1/platform/tenants/${encodeURIComponent(tenantId)}/enabled`, { method: "PUT", body: JSON.stringify({ enabled }) }),
+  updateTenantName: (tenantId, name) => request(`/api/shell/v1/platform/tenants/${encodeURIComponent(tenantId)}/name`, { method: "PUT", body: JSON.stringify({ name }) }),
   saveFilters: (tenantId, resource, body) => request(`/api/shell/v1/tenants/${encodeURIComponent(tenantId)}/saved-filters/${encodeURIComponent(resource)}`, { method: "PUT", body: JSON.stringify(body) }),
 };
