@@ -72,3 +72,23 @@ test("the Roles editor blocks saving and surfaces an error when the permission c
   // a failed per-role permissions fetch must not silently open the editor with an empty list
   assert.match(crud, /catch \{ setError\(t\("field\.permissionsLoadError"\)\); \}/);
 });
+
+test("login failures are classified instead of always blamed on a disconnected service",()=>{
+  const app = read("../src/App.jsx");
+  const en = JSON.parse(read("../src/locales/en.json"));
+  assert.doesNotMatch(app, /login\.unavailable/);
+  assert.doesNotMatch(app, /catch \{ setError\(t\("login\.unavailable"\)\); \}/);
+  assert.match(app, /exception\?\.status === 401.*login\.invalidCredentials/);
+  assert.match(app, /exception\?\.status === 429.*login\.rateLimited/);
+  assert.match(app, /exception\?\.status >= 500.*login\.serviceUnavailable/);
+  assert.match(app, /MFA_REQUIRED.*login\.mfaUnsupported/);
+  for (const key of ["login.invalidCredentials", "login.rateLimited", "login.serviceUnavailable", "login.unexpected", "login.networkError", "login.mfaUnsupported"]) {
+    assert.ok(en[key], `en.json is missing ${key}`);
+  }
+  assert.equal(en["login.unavailable"], undefined, "dead key should have been removed, not left orphaned");
+});
+
+test("api.js attaches the real HTTP status to a failed request instead of just a message string",()=>{
+  const api = read("../src/api.js");
+  assert.match(api, /error\.status = response\.status/);
+});

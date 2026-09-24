@@ -8,6 +8,20 @@ import {matchExtension} from "./extensionRoutes.js";
 
 
 
+// idax-core's LocalCredentialAuthenticator deliberately collapses every credential-related
+// failure (unknown email, wrong password, disabled account) into the same 401
+// INVALID_CREDENTIALS response, by design, so a login screen can never tell those apart without
+// leaking account existence/status - this only distinguishes categories the backend genuinely
+// exposes (see AuthenticationExceptionHandler in idax-shell's own backend).
+function classifyLoginError(exception) {
+  if (exception?.message === "MFA_REQUIRED" || exception?.message === "MFA_SETUP_REQUIRED") return "login.mfaUnsupported";
+  if (exception?.status === 401) return "login.invalidCredentials";
+  if (exception?.status === 429) return "login.rateLimited";
+  if (exception?.status >= 500) return "login.serviceUnavailable";
+  if (exception?.status) return "login.unexpected";
+  return "login.networkError";
+}
+
 function Login({ t, locale, setLocale, onEnter }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,7 +29,7 @@ function Login({ t, locale, setLocale, onEnter }) {
   const submit = async (event) => {
     event.preventDefault(); setError("");
     try { const session = await shellApi.login({ email, password }); onEnter(session); }
-    catch { setError(t("login.unavailable")); }
+    catch (exception) { setError(t(classifyLoginError(exception))); }
   };
   return <main className="login-page">
     <section className="login-story">

@@ -13,7 +13,10 @@ async function request(path, options = {}) {
     const details = contentType.includes("application/json")
       ? await response.json().catch(() => null)
       : null;
-    throw new Error(details?.message || `HTTP ${response.status}`);
+    const error = new Error(details?.message || `HTTP ${response.status}`);
+    error.status = response.status;
+    error.code = details?.code;
+    throw error;
   }
   return response.status === 204 ? null : response.json();
 }
