@@ -47,3 +47,10 @@ test("module extensions receive the active tenant as a header, not just on the S
   assert.match(sdk, /activeTenantId: session\.activeTenantId/);
   assert.match(sdk, /"X-Tenant":\s*session\.activeTenantId/);
 });
+
+test("the Users editor actually assigns roleIds, not just the legacy role label",()=>{
+  const crud = read("../src/CrudWorkspace.jsx");
+  assert.match(crud, /shellApi\.saveUserRoles/);
+  assert.match(crud, /shellApi\.roleUsers/);
+  assert.match(crud, /type: "userRoles"/);
+});
