@@ -73,6 +73,20 @@ test("the Roles editor blocks saving and surfaces an error when the permission c
   assert.match(crud, /catch \{ setError\(t\("field\.permissionsLoadError"\)\); \}/);
 });
 
+test("an inactive role assigned to a user still renders instead of silently vanishing from the editor",()=>{
+  const crud = read("../src/CrudWorkspace.jsx");
+  // the label dropdown must keep the currently-assigned role's option even if it's inactive,
+  // instead of falling back to whatever active role happens to render first
+  assert.match(crud, /const roleLabelOptions = roleCatalog\.filter\(\(role\) => role\.enabled !== false \|\| role\.key === value\.role\)/);
+  // same for the roleIds checkbox list - an inactive-but-assigned role must stay checkable,
+  // or any interaction with the list would silently drop it from the saved set
+  assert.match(crud, /const roleCheckboxOptions = roleCatalog\.filter\(\(role\) => role\.enabled !== false \|\| assignedRoleIds\.includes\(role\.id\)\)/);
+  assert.match(crud, /roleLabel = \(role\) => \(role\.name \|\| role\.key\) \+ \(role\.enabled === false \? ` \(\$\{t\("state\.disabled"\)\}\)` : ""\)/);
+  // roles must never go back to a native <select multiple> - same "click clears everything else"
+  // failure mode the permissions editor already had
+  assert.doesNotMatch(crud, /<select multiple value=\{Array\.isArray\(value\.roles\)/);
+});
+
 test("login failures are classified instead of always blamed on a disconnected service",()=>{
   const app = read("../src/App.jsx");
   const en = JSON.parse(read("../src/locales/en.json"));
