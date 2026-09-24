@@ -54,3 +54,21 @@ test("the Users editor actually assigns roleIds, not just the legacy role label"
   assert.match(crud, /shellApi\.roleUsers/);
   assert.match(crud, /type: "userRoles"/);
 });
+
+test("the Roles editor keeps permissions as an array and never round-trips through a joined string",()=>{
+  const crud = read("../src/CrudWorkspace.jsx");
+  assert.match(crud, /permissions: Array\.isArray\(initial\?\.permissions\) \? initial\.permissions : \[\]/);
+  assert.doesNotMatch(crud, /\.join\(", "\)/);
+  assert.doesNotMatch(crud, /permissions\.split\(","\)/);
+  // toggling one permission must only add/remove that code, never replace the whole set
+  assert.match(crud, /permissions: checked \? \[\.\.\.permissions, code\] : permissions\.filter\(\(existing\) => existing !== code\)/);
+});
+
+test("the Roles editor blocks saving and surfaces an error when the permission catalog fails to load",()=>{
+  const crud = read("../src/CrudWorkspace.jsx");
+  assert.match(crud, /setPermissionCatalogError\(true\)/);
+  assert.match(crud, /const blockSave = kind === "roles" && Boolean\(permissionCatalogError\)/);
+  assert.match(crud, /<button disabled=\{blockSave\}>\{t\("crud\.save"\)\}<\/button>/);
+  // a failed per-role permissions fetch must not silently open the editor with an empty list
+  assert.match(crud, /catch \{ setError\(t\("field\.permissionsLoadError"\)\); \}/);
+});

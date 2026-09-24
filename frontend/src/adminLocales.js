@@ -6,6 +6,7 @@ const en = {
   "admin.coreRequired": "The secured Core operation could not be completed.",
   "field.displayName": "Display name", "field.email": "Email", "field.role": "Membership role (label only)", "field.password": "Password", "field.enabled": "Enabled", "field.name": "Name", "field.key": "Key", "field.description": "Description", "field.permissionCount": "Permissions", "field.permissions": "Permissions", "field.resource": "Resource", "field.field": "Field", "field.value": "Value", "field.schedule": "Cron schedule", "field.status": "Status", "field.entityKey": "Entity", "field.filters": "Filter JSON", "field.cron": "Cron schedule", "field.channelEmail": "Email channel", "field.channelMessage": "Message channel",
   "field.roles": "Assigned roles", "field.rolesHint": "These roles actually grant this user's permissions. Membership role above is a display label only.",
+  "field.permissionsSelected": "selected", "field.permissionsLoadError": "The permission catalog could not be loaded. Saving is disabled until it loads correctly.",
   "state.enabled": "Enabled", "state.disabled": "Disabled"
 };
 
@@ -18,6 +19,7 @@ const es = {
   "admin.coreRequired": "No se pudo completar la operación protegida de Core.",
   "field.displayName": "Nombre visible", "field.email": "Correo electrónico", "field.role": "Rol de pertenencia (solo etiqueta)", "field.password": "Contraseña", "field.enabled": "Activo", "field.name": "Nombre", "field.key": "Clave", "field.description": "Descripción", "field.permissionCount": "Permisos", "field.permissions": "Permisos", "field.resource": "Recurso", "field.field": "Campo", "field.value": "Valor", "field.schedule": "Programación cron", "field.status": "Estado", "field.entityKey": "Entidad", "field.filters": "Filtro JSON", "field.cron": "Programación cron", "field.channelEmail": "Canal de correo", "field.channelMessage": "Canal de mensajes",
   "field.roles": "Roles asignados", "field.rolesHint": "Estos roles son los que realmente conceden los permisos de este usuario. El «Rol de pertenencia» de arriba es solo una etiqueta visual.",
+  "field.permissionsSelected": "seleccionados", "field.permissionsLoadError": "No se pudo cargar el catálogo de permisos. El guardado está deshabilitado hasta que cargue correctamente.",
   "state.enabled": "Activo", "state.disabled": "Inactivo"
 };
 
