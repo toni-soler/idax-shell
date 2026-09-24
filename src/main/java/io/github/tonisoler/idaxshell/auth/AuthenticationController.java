@@ -5,13 +5,11 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import es.idynamicsax.idax.security.CurrentUser;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/shell/v1")
@@ -20,12 +18,15 @@ public class AuthenticationController {
   private final LocalAuthenticationService authentication;
   public AuthenticationController(LocalAuthenticationService authentication) { this.authentication = authentication; }
 
+  // Failure classification (INVALID_CREDENTIALS vs RATE_LIMITED, both with distinct HTTP statuses)
+  // lives in AuthenticationExceptionHandler, not here - see that class for why: idax-core's own
+  // LocalCredentialAuthenticator deliberately collapses every credential-related failure (unknown
+  // email, wrong password, disabled account) into one IllegalArgumentException("INVALID_CREDENTIALS"),
+  // by design, to avoid leaking account existence/status. RateLimitedException is a genuinely
+  // distinct, safe-to-reveal case that previously fell through uncaught to a bare 500.
   @PostMapping("/auth/login")
   public Object login(@Valid @RequestBody LoginRequest request) {
-    try { return authentication.login(request.email(), request.password()); }
-    catch (org.springframework.security.core.AuthenticationException exception) {
-      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
-    }
+    return authentication.login(request.email(), request.password());
   }
 
   @GetMapping("/session")
