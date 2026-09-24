@@ -40,6 +40,17 @@ test("administration reuses one generic CRUD workspace and versioned APIs", () =
 });
 
 import {matchExtension} from "../src/extensionRoutes.js";
+
+test("platform tenant management is superuser-gated in the nav and the route, and never scoped to a tenantId",()=>{
+  const app = read("../src/App.jsx");
+  const api = read("../src/api.js");
+  // creating a tenant has no tenant context to hang off yet - must never look like the
+  // /tenants/{tenantId}/... shape every other admin resource uses
+  assert.match(api, /platformTenants: \(\) => request\("\/api\/shell\/v1\/platform\/tenants"\)/);
+  assert.doesNotMatch(api, /platformTenants: \(tenantId\)/);
+  assert.match(app, /session\.user\?\.superuser \? \[\["tenants","▦"\]\] : \[\]/);
+  assert.match(app, /page === "tenants" && session\.user\?\.superuser && <TenantAdmin/);
+});
 test("module matching uses manifest route, not id or substring",()=>{const modules=[{id:"orchard",route:"/community/garden"}];assert.equal(matchExtension(modules,"/community/garden/new").id,"orchard");assert.equal(matchExtension(modules,"/community/gardening"),undefined);assert.equal(matchExtension(modules,"/orchard"),undefined);});
 
 test("module extensions receive the active tenant as a header, not just on the SDK object",()=>{
