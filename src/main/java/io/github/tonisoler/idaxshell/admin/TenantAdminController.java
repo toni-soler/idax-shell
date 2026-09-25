@@ -1,19 +1,24 @@
 package io.github.tonisoler.idaxshell.admin;
 
+import es.idynamicsax.idax.repository.admin.TenantCreateRepository;
 import es.idynamicsax.idax.repository.admin.TenantSearchGlobalRepository;
 import es.idynamicsax.idax.repository.admin.TenantSetEnabledRepository;
 import es.idynamicsax.idax.repository.admin.TenantUpdateNameRepository;
-import es.idynamicsax.idax.service.admin.TenantOnboardingService;
-import es.idynamicsax.idax.service.admin.dto.TenantOnboardingRequest;
+import es.idynamicsax.idax.security.CurrentUser;
+import es.idynamicsax.idax.service.tenant.TenantUserService;
+import es.idynamicsax.idax.service.tenant.dto.TenantUserRequest;
+import es.idynamicsax.idax.tenant.TenantContext;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
@@ -26,26 +31,32 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
  * itself (authentication.principal is the CurrentUser set by idax-core's shared JwtAuthFilter),
  * never a per-tenant permission code.
  *
- * Wraps idax-core's own TenantOnboardingService/TenantSearchGlobalRepository/
- * TenantSetEnabledRepository/TenantUpdateNameRepository - the same tenant_create() path
- * LocalDemoInitializer already uses to bootstrap the very first tenant - previously never exposed
- * through any idax-shell endpoint or admin screen. Lets an admin spin up a genuinely separate
- * tenant (its own STIR marketplace, its own osTRIS economic community - everything is tenant_id
- * scoped under RLS) for test/pilot data instead of co-mingling it with production data under
- * PRUEBA labels in the same tenant.
+ * create() deliberately does NOT use idax-core's own TenantOnboardingService.createOrBootstrapTenant,
+ * despite that looking like the obvious fit - it unconditionally calls ensureDataArea(), which
+ * requires an "idax.dataarea" table (AX4-legacy-integration schema) that STIR's deployment never
+ * provisions, since STIR has no AX4 integration. Confirmed live (25/09/2026): calling it threw
+ * BadSqlGrammarException - relation "idax.dataarea" does not exist - for both
+ * createOrBootstrapTenant and its bootstrapExistingTenant sibling (same ensureDataArea() call).
+ * Composed instead from TenantCreateRepository (tenant row only, no DataArea) and TenantUserService
+ * (the same service AdministrationController.createUser already uses successfully for ordinary
+ * tenant users, including local passwords - proven all session, never touches DataArea).
  */
 @RestController
 @RequestMapping("/api/shell/v1/platform/tenants")
 public class TenantAdminController {
   private final TenantSearchGlobalRepository search;
-  private final TenantOnboardingService onboarding;
+  private final TenantCreateRepository create;
+  private final TenantUserService tenantUsers;
   private final TenantSetEnabledRepository setEnabledRepository;
   private final TenantUpdateNameRepository updateNameRepository;
+  private final JdbcTemplate jdbcTemplate;
 
-  public TenantAdminController(TenantSearchGlobalRepository search, TenantOnboardingService onboarding,
-      TenantSetEnabledRepository setEnabledRepository, TenantUpdateNameRepository updateNameRepository) {
-    this.search = search; this.onboarding = onboarding;
+  public TenantAdminController(TenantSearchGlobalRepository search, TenantCreateRepository create,
+      TenantUserService tenantUsers, TenantSetEnabledRepository setEnabledRepository,
+      TenantUpdateNameRepository updateNameRepository, JdbcTemplate jdbcTemplate) {
+    this.search = search; this.create = create; this.tenantUsers = tenantUsers;
     this.setEnabledRepository = setEnabledRepository; this.updateNameRepository = updateNameRepository;
+    this.jdbcTemplate = jdbcTemplate;
   }
 
   @GetMapping
@@ -60,24 +71,28 @@ public class TenantAdminController {
 
   @PostMapping @ResponseStatus(HttpStatus.CREATED)
   @PreAuthorize("authentication.principal.superuser")
-  public TenantAdminView create(@Valid @RequestBody TenantCreateRequest request) {
-    // dataAreaId is an AX4-legacy-integration concept idax-core's onboarding contract requires
-    // unconditionally (exactly 3 characters) - irrelevant to a STIR-only tenant with no AX4 side,
-    // so it's derived here rather than asked of the admin creating a plain marketplace tenant.
-    String dataAreaId = dataAreaIdFrom(request.tenantCode());
-    var response = onboarding.createOrBootstrapTenant(TenantOnboardingRequest.builder()
-        .tenantCode(request.tenantCode().trim())
-        .tenantName(request.tenantName().trim())
-        .adminSubject(request.adminEmail().trim())
-        .adminEmail(request.adminEmail().trim())
-        .adminDisplayName(request.adminDisplayName().trim())
-        .adminAuthProvider("local")
-        .adminPassword(request.adminPassword())
-        .tenantRole("owner")
-        .dataAreaId(dataAreaId)
-        .dataAreaName(request.tenantName().trim())
-        .build());
-    return new TenantAdminView(response.tenantId(), response.tenantCode(), request.tenantName().trim(), true, false, OffsetDateTime.now());
+  @Transactional
+  public TenantAdminView create(@Valid @RequestBody TenantCreateRequest request, @AuthenticationPrincipal CurrentUser caller) {
+    var tenant = create.create(request.tenantCode().trim(), request.tenantName().trim(), "active", false);
+    // TenantUserService.create() guards TenantContext.get().tenantId == the tenantId argument
+    // (SecurityException("Tenant mismatch") otherwise) - correct for its normal callers (always
+    // an already-resolved tenant the caller belongs to), but this tenant didn't exist a moment
+    // ago, so there is no resolved context for it yet. Elevate explicitly for the rest of this
+    // transaction, mirroring idax_core's own bootstrap pattern (TenantOnboardingService also does
+    // exactly this SET LOCAL ROLE + set_tenant dance before its own cross-tenant writes).
+    jdbcTemplate.execute("SET LOCAL ROLE idax_admin");
+    jdbcTemplate.execute("SELECT idax_core.set_tenant(?)", (java.sql.PreparedStatement ps) -> {
+      ps.setObject(1, tenant.tenantId()); ps.execute(); return null;
+    });
+    TenantContext.set(new TenantContext(tenant.tenantId(), tenant.code(), caller.getUserId(), caller.getUsername(), TenantContext.DbRole.IDAX_ADMIN));
+    try {
+      tenantUsers.create(tenant.tenantId(), new TenantUserRequest(
+          request.adminEmail().trim(), request.adminEmail().trim(), request.adminDisplayName().trim(),
+          "local", request.adminPassword(), "owner", Boolean.TRUE, Boolean.FALSE));
+    } finally {
+      TenantContext.clear();
+    }
+    return new TenantAdminView(tenant.tenantId(), tenant.code(), tenant.name(), true, tenant.mfaRequired(), tenant.createdAt());
   }
 
   @PutMapping("/{tenantId}/enabled")
@@ -92,12 +107,6 @@ public class TenantAdminController {
   public TenantAdminView updateName(@PathVariable UUID tenantId, @RequestBody Map<String, String> body) {
     return updateNameRepository.updateName(tenantId, body.get("name"))
         .map(TenantAdminView::of).orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Tenant not found"));
-  }
-
-  static String dataAreaIdFrom(String tenantCode) {
-    String alnum = tenantCode.replaceAll("[^A-Za-z0-9]", "").toUpperCase();
-    String padded = (alnum + "XXX").substring(0, 3);
-    return padded;
   }
 
   public record TenantCreateRequest(
