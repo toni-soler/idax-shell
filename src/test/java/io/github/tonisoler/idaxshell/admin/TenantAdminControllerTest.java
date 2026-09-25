@@ -69,7 +69,13 @@ class TenantAdminControllerTest {
         UUID tenantId = UUID.randomUUID();
         var row = new TenantSearchGlobalRepository.TenantRow(tenantId, "STIR", "STIR", "active", false, OffsetDateTime.now(), OffsetDateTime.now());
         var disabledRow = new TenantSearchGlobalRepository.TenantRow(UUID.randomUUID(), "OLD", "Old tenant", "disabled", false, OffsetDateTime.now(), OffsetDateTime.now());
-        when(search.search(null, null, null, 0, 500)).thenReturn(new TenantSearchGlobalRepository.SearchResult(List.of(row, disabledRow), 2));
+        // idax_core.tenant_search_global's signature is (code, name, enabled, LIMIT, OFFSET) -
+        // limit before offset. Swapping them isn't a SQL error (LIMIT 0 is valid), so it fails
+        // silently with zero rows and no exception anywhere - reproduced live in production
+        // (25/09/2026): the Espacios screen showed "no hay registros" for an existing tenant with
+        // a clean HTTP 200 and nothing in the application logs. Stubbing the exact expected
+        // argument order here means a regression fails this test, not just production.
+        when(search.search(null, null, null, 500, 0)).thenReturn(new TenantSearchGlobalRepository.SearchResult(List.of(row, disabledRow), 2));
 
         List<TenantAdminView> views = controller.list();
 
