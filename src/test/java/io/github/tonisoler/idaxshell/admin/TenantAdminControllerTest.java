@@ -1,67 +1,79 @@
 package io.github.tonisoler.idaxshell.admin;
 
+import es.idynamicsax.idax.repository.admin.TenantCreateRepository;
 import es.idynamicsax.idax.repository.admin.TenantSearchGlobalRepository;
 import es.idynamicsax.idax.repository.admin.TenantSetEnabledRepository;
 import es.idynamicsax.idax.repository.admin.TenantUpdateNameRepository;
-import es.idynamicsax.idax.service.admin.TenantOnboardingService;
-import es.idynamicsax.idax.service.admin.dto.TenantOnboardingRequest;
-import es.idynamicsax.idax.service.admin.dto.TenantOnboardingResponse;
+import es.idynamicsax.idax.security.CurrentUser;
+import es.idynamicsax.idax.service.tenant.TenantUserService;
+import es.idynamicsax.idax.service.tenant.dto.TenantUserRequest;
+import es.idynamicsax.idax.service.tenant.dto.TenantUserResponse;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.server.ResponseStatusException;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
-/** TenantAdminController is the only place idax-shell exposes idax-core's TenantOnboardingService
- * - previously never wired up anywhere, so creating a genuinely separate tenant (its own STIR
- * marketplace, its own osTRIS economic community) required hand-running SQL. Every method here is
+/**
+ * TenantAdminController is the only place idax-shell exposes tenant (workspace) creation -
+ * previously never wired up anywhere, so a genuinely separate tenant (its own STIR marketplace,
+ * its own osTRIS economic community) required hand-running SQL. Every method here is
  * @PreAuthorize("authentication.principal.superuser") - deliberately NOT the per-tenant
  * permission-code pattern AdministrationController uses, since there is no tenant context yet
- * when you're creating one. */
+ * when you're creating one.
+ *
+ * create() composes TenantCreateRepository + TenantUserService rather than idax-core's own
+ * TenantOnboardingService.createOrBootstrapTenant, which unconditionally requires an
+ * AX4-legacy-integration "idax.dataarea" table STIR's deployment never provisions - confirmed
+ * live (25/09/2026): BadSqlGrammarException, relation "idax.dataarea" does not exist.
+ */
 class TenantAdminControllerTest {
     TenantSearchGlobalRepository search = mock(TenantSearchGlobalRepository.class);
-    TenantOnboardingService onboarding = mock(TenantOnboardingService.class);
+    TenantCreateRepository create = mock(TenantCreateRepository.class);
+    TenantUserService tenantUsers = mock(TenantUserService.class);
     TenantSetEnabledRepository setEnabled = mock(TenantSetEnabledRepository.class);
     TenantUpdateNameRepository updateName = mock(TenantUpdateNameRepository.class);
-    TenantAdminController controller = new TenantAdminController(search, onboarding, setEnabled, updateName);
+    JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+    TenantAdminController controller = new TenantAdminController(search, create, tenantUsers, setEnabled, updateName, jdbcTemplate);
+    CurrentUser caller = new CurrentUser(UUID.randomUUID(), "admin@stir.es", null, true, Set.of("ROLE_SUPERUSER"));
 
-    @Test void dataAreaIdIsAlwaysExactlyThreeUppercaseCharacters() {
-        // idax-core's TenantOnboardingService.validateRequest() rejects anything else ("dataAreaId
-        // must have exactly 3 characters (AX DataAreaId)") - this is an AX4-legacy-integration
-        // concept irrelevant to a STIR-only tenant, so it must never be something the admin has to
-        // get right by hand.
-        assertEquals("STI", TenantAdminController.dataAreaIdFrom("stir-test"));
-        assertEquals("PRX", TenantAdminController.dataAreaIdFrom("pr"));
-        assertEquals("XXX", TenantAdminController.dataAreaIdFrom(""));
-        assertEquals("A1B", TenantAdminController.dataAreaIdFrom("a1-b!c"));
-    }
-
-    @Test void createBuildsALocalAdminOnboardingRequestWithADerivedDataArea() {
+    @Test void createComposesTenantCreationAndItsFirstLocalAdminWithoutTouchingDataArea() {
         UUID tenantId = UUID.randomUUID();
-        when(onboarding.createOrBootstrapTenant(any())).thenReturn(
-            new TenantOnboardingResponse(true, tenantId, "PRUEBA", UUID.randomUUID(), "owner", true, "PRU"));
+        OffsetDateTime createdAt = OffsetDateTime.now();
+        when(create.create("stir-pruebas", "STIR - pruebas", "active", false))
+            .thenReturn(new TenantCreateRepository.TenantRow(tenantId, "stir-pruebas", "STIR - pruebas", "active", false, createdAt, createdAt));
+        when(tenantUsers.create(eq(tenantId), any())).thenReturn(mock(TenantUserResponse.class));
 
         var result = controller.create(new TenantAdminController.TenantCreateRequest(
-            "PRUEBA", "Tenant de pruebas", "admin@pruebas.test", "Admin Pruebas", "hunter22"));
+            "stir-pruebas", "STIR - pruebas", "admin.pruebas@stir.es", "Admin Pruebas", "hunter22"), caller);
 
-        var captor = org.mockito.ArgumentCaptor.forClass(TenantOnboardingRequest.class);
-        verify(onboarding).createOrBootstrapTenant(captor.capture());
+        // must elevate to idax_admin and set the new tenant as current BEFORE creating its first
+        // user - TenantUserService.create() throws SecurityException("Tenant mismatch") otherwise,
+        // since it guards TenantContext.get().tenantId == the tenantId argument.
+        verify(jdbcTemplate).execute("SET LOCAL ROLE idax_admin");
+        verify(jdbcTemplate).execute(eq("SELECT idax_core.set_tenant(?)"), any(org.springframework.jdbc.core.PreparedStatementCallback.class));
+
+        var captor = org.mockito.ArgumentCaptor.forClass(TenantUserRequest.class);
+        verify(tenantUsers).create(eq(tenantId), captor.capture());
         var request = captor.getValue();
-        assertEquals("PRUEBA", request.getTenantCode());
-        assertEquals("Tenant de pruebas", request.getTenantName());
-        assertEquals("admin@pruebas.test", request.getAdminSubject(), "local auth keys identity by email, matching the existing users editor's convention");
-        assertEquals("admin@pruebas.test", request.getAdminEmail());
-        assertEquals("local", request.getAdminAuthProvider());
-        assertEquals("hunter22", request.getAdminPassword());
-        assertEquals("owner", request.getTenantRole());
-        assertEquals("PRU", request.getDataAreaId());
+        assertEquals("admin.pruebas@stir.es", request.subject());
+        assertEquals("admin.pruebas@stir.es", request.email());
+        assertEquals("Admin Pruebas", request.displayName());
+        assertEquals("local", request.authProvider());
+        assertEquals("hunter22", request.password());
+        assertEquals("owner", request.role());
+        assertEquals(Boolean.TRUE, request.enabled());
 
         assertEquals(tenantId, result.id());
+        assertEquals("stir-pruebas", result.code());
         assertTrue(result.enabled(), "a freshly created tenant must start enabled");
     }
 
