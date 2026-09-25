@@ -51,7 +51,11 @@ public class TenantAdminController {
   @GetMapping
   @PreAuthorize("authentication.principal.superuser")
   public List<TenantAdminView> list() {
-    return search.search(null, null, null, 0, 500).rows().stream().map(TenantAdminView::of).toList();
+    // idax_core.tenant_search_global(p_code, p_name, p_enabled, p_limit, p_offset) - limit before
+    // offset. Swapping them (as a first version of this method did) isn't a SQL error - LIMIT 0
+    // OFFSET 500 is syntactically valid, so it silently returns zero rows with no exception
+    // anywhere in the stack, exactly matching what shipped: an empty list, no error, no log line.
+    return search.search(null, null, null, 500, 0).rows().stream().map(TenantAdminView::of).toList();
   }
 
   @PostMapping @ResponseStatus(HttpStatus.CREATED)
