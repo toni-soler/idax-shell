@@ -9,6 +9,7 @@ import es.idynamicsax.idax.tenant.TenantContextFilter;
 import es.idynamicsax.idax.tenant.TenantResolver;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -28,6 +29,14 @@ public class SecurityConfiguration {
           "/logo-*.svg", "/actuator/health/**", "/api/shell/v1/bootstrap/status",
           "/api/shell/v1/auth/**",
           "/extensions/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+        // Client-credentials token exchange (ServiceAuthController / idax-core's
+        // ServiceTokenIssuer): the POST body itself carries the credentials that authenticate
+        // the caller, exactly like /api/shell/v1/auth/login above - permitAll here only lets
+        // the request reach that check, it never skips it (ServiceTokenIssuer rejects anything
+        // without a valid client id + secret + active tenant + effective grant, uniformly, as
+        // ServiceAuthenticationException -> 401). Scoped to POST only: GET carries no
+        // credentials and must stay authenticated, so it never reaches this matcher.
+        .requestMatchers(HttpMethod.POST, "/api/service-auth/token").permitAll()
         .requestMatchers(extensions::isSpaRequest).permitAll()
         .anyRequest().authenticated())
       .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
