@@ -11,6 +11,35 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice(assignableTypes = AuthenticationController.class)
 public class AuthenticationExceptionHandler {
+  /**
+   * Core's MFA services report outcomes as IllegalArgumentException codes (MfaLoginService,
+   * MfaForcedSetupService). Without this they fell through to a bare 500, so a client could not
+   * tell a wrong code from an expired challenge or a dead backend. Only these known, non-secret
+   * codes are relayed; anything else stays an opaque failure. A wrong or reused code is 401; an
+   * expired or unknown challenge/setup token means "start again" (also 401); a state conflict is 409.
+   */
+  static final Map<String, HttpStatus> MFA_OUTCOMES = Map.ofEntries(
+      Map.entry("INVALID_TOTP", HttpStatus.UNAUTHORIZED),
+      Map.entry("INVALID_RECOVERY_CODE", HttpStatus.UNAUTHORIZED),
+      Map.entry("INVALID_MFA_CHALLENGE", HttpStatus.UNAUTHORIZED),
+      Map.entry("INVALID_MFA_SETUP_TOKEN", HttpStatus.UNAUTHORIZED),
+      Map.entry("MFA_SETUP_EXPIRED", HttpStatus.UNAUTHORIZED),
+      Map.entry("MFA_SETUP_NOT_STARTED", HttpStatus.CONFLICT),
+      Map.entry("MFA_ACTIVATION_CONFLICT", HttpStatus.CONFLICT),
+      Map.entry("MFA_ALREADY_ENABLED", HttpStatus.CONFLICT),
+      Map.entry("MFA_NOT_ENABLED", HttpStatus.CONFLICT),
+      Map.entry("MFA_DISABLED_GLOBALLY", HttpStatus.CONFLICT));
+
+  @ExceptionHandler(IllegalArgumentException.class)
+  ResponseEntity<Map<String, String>> mfaOutcome(IllegalArgumentException exception) {
+    String code = exception.getMessage();
+    HttpStatus status = code == null ? null : MFA_OUTCOMES.get(code);
+    if (status == null) {
+      return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("code", "AUTHENTICATION_FAILED", "message", "Authentication failed"));
+    }
+    return ResponseEntity.status(status).body(Map.of("code", code, "message", code));
+  }
+
   @ExceptionHandler(AuthenticationException.class)
   ResponseEntity<Map<String, String>> invalidCredentials(AuthenticationException exception) {
     return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
