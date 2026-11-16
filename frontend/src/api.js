@@ -1,7 +1,9 @@
 const baseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
 async function request(path, options = {}) {
-  const isLogin = path === "/api/shell/v1/auth/login";
+  // Every /auth/ step (password, second factor, forced setup) happens before a session exists and
+  // must never carry a previous bearer token.
+  const isLogin = path.startsWith("/api/shell/v1/auth/");
   const token = isLogin ? null : sessionStorage.getItem("idax.accessToken");
   const response = await fetch(`${baseUrl}${path}`, {
     ...options,
@@ -16,20 +18,37 @@ async function request(path, options = {}) {
     const error = new Error(details?.message || `HTTP ${response.status}`);
     error.status = response.status;
     error.code = details?.code;
+    error.lockedUntil = details?.lockedUntil;
     throw error;
   }
   return response.status === 204 ? null : response.json();
+}
+
+/** A session exists only once every required step is complete; only then is the token stored. */
+function keepSession(session) {
+  if (!session?.accessToken) throw new Error("Sign-in did not complete");
+  sessionStorage.setItem("idax.accessToken", session.accessToken);
+  return session;
 }
 
 export const shellApi = {
   session: () => request("/api/shell/v1/session"),
   login: async (credentials) => {
     sessionStorage.removeItem("idax.accessToken");
-    const session = await request("/api/shell/v1/auth/login", { method: "POST", body: JSON.stringify(credentials) });
-    if (!session.accessToken) throw new Error(session.status || "Additional authentication is required");
-    sessionStorage.setItem("idax.accessToken", session.accessToken);
-    return session;
+    const outcome = await request("/api/shell/v1/auth/login", { method: "POST", body: JSON.stringify(credentials) });
+    // The password step may not be the last one. The challenge and setup tokens grant nothing but
+    // the next step; they are returned to the caller's memory only, never stored.
+    if (outcome.status === "MFA_REQUIRED") return { step: "MFA", challengeToken: outcome.challengeToken };
+    if (outcome.status === "MFA_SETUP_REQUIRED") return { step: "MFA_SETUP", setupToken: outcome.setupToken };
+    return { step: "SESSION", session: keepSession(outcome) };
   },
+  verifyMfa: async (challengeToken, code) => keepSession(
+    await request("/api/shell/v1/auth/mfa/verify", { method: "POST", body: JSON.stringify({ challengeToken, code }) })),
+  startMfaSetup: (setupToken) => request("/api/shell/v1/auth/mfa/setup-required/start", { method: "POST", body: JSON.stringify({ setupToken }) }),
+  // The session that comes with the recovery codes is NOT stored here: the caller stores it with
+  // enterSession() only once the user has confirmed the codes are saved.
+  activateMfaSetup: (setupToken, code) => request("/api/shell/v1/auth/mfa/setup-required/activate", { method: "POST", body: JSON.stringify({ setupToken, code }) }),
+  enterSession: (session) => keepSession(session),
   logout: () => { sessionStorage.removeItem("idax.accessToken"); return Promise.resolve(); },
   tenants: () => request("/api/shell/v1/tenants"),
   modules: async () => (await request("/api/shell/v1/extensions")).extensions,

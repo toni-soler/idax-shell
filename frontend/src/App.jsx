@@ -15,7 +15,6 @@ import {matchExtension} from "./extensionRoutes.js";
 // leaking account existence/status - this only distinguishes categories the backend genuinely
 // exposes (see AuthenticationExceptionHandler in idax-shell's own backend).
 function classifyLoginError(exception) {
-  if (exception?.message === "MFA_REQUIRED" || exception?.message === "MFA_SETUP_REQUIRED") return "login.mfaUnsupported";
   if (exception?.status === 401) return "login.invalidCredentials";
   if (exception?.status === 429) return "login.rateLimited";
   if (exception?.status >= 500) return "login.serviceUnavailable";
@@ -23,14 +22,83 @@ function classifyLoginError(exception) {
   return "login.networkError";
 }
 
+// Second-step outcomes the backend reports with a stable code. An expired or unknown challenge or
+// setup token cannot be retried: the flow starts again from the password.
+const SECOND_STEP_EXPIRED = ["INVALID_MFA_CHALLENGE", "INVALID_MFA_SETUP_TOKEN", "MFA_SETUP_EXPIRED"];
+function classifySecondStepError(exception) {
+  if (SECOND_STEP_EXPIRED.includes(exception?.code)) return "mfa.expired";
+  if (exception?.code === "INVALID_TOTP") return "mfa.invalidCode";
+  if (exception?.code === "INVALID_RECOVERY_CODE") return "mfa.invalidRecovery";
+  if (exception?.status === 429) return "login.rateLimited";
+  if (exception?.status >= 500) return "login.serviceUnavailable";
+  if (exception?.status) return "login.unexpected";
+  return "login.networkError";
+}
+/** Groups the Base32 key in fours so it can be typed into an authenticator app. */
+const groupSecret = (secret) => (secret ?? "").replace(/\s+/g, "").replace(/(.{4})/g, "$1 ").trim();
+
+/**
+ * Second sign-in step (MFA_REQUIRED / MFA_SETUP_REQUIRED). Codes, the setup key and the recovery
+ * codes live only in this component's state: never stored, logged or sent anywhere but the shell
+ * API. The session is stored and handed to the app only when the whole flow is complete - after a
+ * forced setup, only once the user confirms the recovery codes are saved.
+ */
+function SecondStep({ t, step, onEnter, onCancel }) {
+  const [code, setCode] = useState("");
+  const [setup, setSetup] = useState(null);
+  const [recovery, setRecovery] = useState(null);
+  const [saved, setSaved] = useState(false);
+  const [failure, setFailure] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const forcedSetup = step.step === "MFA_SETUP";
+  useEffect(() => {
+    if (!forcedSetup) return undefined;
+    let live = true;
+    shellApi.startMfaSetup(step.setupToken).then((value) => live && setSetup(value), (exception) => live && setFailure(exception));
+    return () => { live = false; };
+  }, [step, forcedSetup]);
+  const expired = SECOND_STEP_EXPIRED.includes(failure?.code);
+  const submit = async (event) => {
+    event.preventDefault(); setBusy(true); setFailure(null);
+    try {
+      if (!forcedSetup) { const session = await shellApi.verifyMfa(step.challengeToken, code.trim()); setCode(""); onEnter(session); return; }
+      const result = await shellApi.activateMfaSetup(step.setupToken, code.trim());
+      setCode(""); setSetup(null); setRecovery(result);
+    } catch (exception) { setCode(""); setFailure(exception); } finally { setBusy(false); }
+  };
+  if (recovery) return <form data-testid="mfa-recovery" onSubmit={(event) => { event.preventDefault(); const session = recovery.session; setRecovery(null); onEnter(shellApi.enterSession(session)); }}>
+    <p className="kicker">{t("login.kicker")}</p><h2>{t("mfa.recoveryTitle")}</h2>
+    <p className="login-help">{t("mfa.recoveryHelp")}</p>
+    <ol className="recovery-codes" data-testid="mfa-recovery-codes">{recovery.recoveryCodes.map((item) => <li key={item}><code>{item}</code></li>)}</ol>
+    <label className="login-check"><input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} data-testid="mfa-recovery-saved" /><span>{t("mfa.recoverySaved")}</span></label>
+    <button type="submit" disabled={!saved} data-testid="mfa-recovery-continue">{t("mfa.continue")} <span>→</span></button>
+  </form>;
+  return <form onSubmit={submit} data-testid={forcedSetup ? "mfa-setup" : "mfa-challenge"}>
+    <p className="kicker">{t("login.kicker")}</p><h2>{t(forcedSetup ? "mfa.setupTitle" : "mfa.title")}</h2>
+    <p className="login-help">{t(forcedSetup ? "mfa.setupHelp" : "mfa.help")}</p>
+    {forcedSetup && setup && <div className="mfa-key"><span>{t("mfa.setupKey")}</span><code data-testid="mfa-setup-secret">{groupSecret(setup.secret)}</code>
+      <a href={setup.otpauthUri} data-testid="mfa-setup-link">{t("mfa.setupOpenApp")}</a></div>}
+    <label>{t(forcedSetup ? "mfa.setupCode" : "mfa.code")}<input value={code} onChange={(e) => setCode(e.target.value)} required disabled={expired}
+      autoComplete="one-time-code" inputMode={forcedSetup ? "numeric" : "text"} maxLength={32} data-testid="mfa-code" /></label>
+    {!forcedSetup && <p className="login-help">{t("mfa.recoveryHint")}</p>}
+    {failure && <p className="error" role="alert" data-testid="mfa-error">{t(classifySecondStepError(failure))}</p>}
+    {!expired && <button type="submit" disabled={busy || (forcedSetup && !setup)} data-testid="mfa-submit">{t("mfa.verify")} <span>→</span></button>}
+    <button className="demo" type="button" onClick={onCancel} data-testid="mfa-cancel">{t(expired ? "mfa.restart" : "mfa.cancel")}</button>
+  </form>;
+}
+
 function Login({ t, locale, setLocale, onEnter }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [pending, setPending] = useState(null);
   const submit = async (event) => {
     event.preventDefault(); setError("");
-    try { const session = await shellApi.login({ email, password }); onEnter(session); }
-    catch (exception) { setError(t(classifyLoginError(exception))); }
+    try {
+      const outcome = await shellApi.login({ email, password });
+      setPassword("");
+      if (outcome.step === "SESSION") onEnter(outcome.session); else setPending(outcome);
+    } catch (exception) { setError(t(classifyLoginError(exception))); }
   };
   return <main className="login-page">
     <section className="login-story">
@@ -41,12 +109,13 @@ function Login({ t, locale, setLocale, onEnter }) {
     </section>
     <section className="login-panel">
       <div className="language"><select aria-label={t("language")} value={locale} onChange={(e) => setLocale(e.target.value)}>{Object.entries(localeNames).map(([code, name]) => <option key={code} value={code}>{name}</option>)}</select></div>
+      {pending ? <SecondStep t={t} step={pending} onEnter={onEnter} onCancel={() => setPending(null)} /> :
       <form onSubmit={submit}><p className="kicker">{t("login.kicker")}</p><h2>{t("login.title")}</h2>
         <label>{t("login.email")}<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="username" /></label>
         <label>{t("login.password")}<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" /></label>
         {error && <p className="error">{error}</p>}<button type="submit">{t("login.submit")} <span>→</span></button>
         <button className="demo" type="button" onClick={() => onEnter({ user: { displayName: t("demo.user") }, tenants: [{ id: "demo", name: t("demo.tenant") }], demo: true })}>{t("login.demo")}</button>
-      </form>
+      </form>}
     </section>
   </main>;
 }

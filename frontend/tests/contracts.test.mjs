@@ -14,7 +14,7 @@ test("API calls stay behind the versioned shell boundary", () => {
   assert.match(source, /\/api\/shell\/v1\/auth\/login/);
   assert.match(source, /\/api\/shell\/v1\/extensions/);
   assert.match(source, /sessionStorage\.setItem\("idax\.accessToken"/);
-  assert.match(source, /const isLogin = path === "\/api\/shell\/v1\/auth\/login"/);
+  assert.match(source, /const isLogin = path\.startsWith\("\/api\/shell\/v1\/auth\/"\)/);
   assert.match(source, /sessionStorage\.removeItem\("idax\.accessToken"\)/);
   assert.doesNotMatch(source, /\/api\/legacy/i);
 });
@@ -106,14 +106,31 @@ test("login failures are classified instead of always blamed on a disconnected s
   assert.match(app, /exception\?\.status === 401.*login\.invalidCredentials/);
   assert.match(app, /exception\?\.status === 429.*login\.rateLimited/);
   assert.match(app, /exception\?\.status >= 500.*login\.serviceUnavailable/);
-  assert.match(app, /MFA_REQUIRED.*login\.mfaUnsupported/);
-  for (const key of ["login.invalidCredentials", "login.rateLimited", "login.serviceUnavailable", "login.unexpected", "login.networkError", "login.mfaUnsupported"]) {
+  assert.match(app, /INVALID_TOTP.*mfa\.invalidCode/);
+  for (const key of ["login.invalidCredentials", "login.rateLimited", "login.serviceUnavailable", "login.unexpected", "login.networkError", "mfa.invalidCode", "mfa.expired"]) {
     assert.ok(en[key], `en.json is missing ${key}`);
   }
   assert.equal(en["login.unavailable"], undefined, "dead key should have been removed, not left orphaned");
+  assert.equal(en["login.mfaUnsupported"], undefined, "two-step sign-in is supported now; the placeholder key is gone");
 });
 
 test("api.js attaches the real HTTP status to a failed request instead of just a message string",()=>{
   const api = read("../src/api.js");
   assert.match(api, /error\.status = response\.status/);
+});
+
+test("two-step sign-in follows the shell contracts and keeps secrets out of storage", () => {
+  const api = read("../src/api.js");
+  const app = read("../src/App.jsx");
+  assert.match(api, /\/api\/shell\/v1\/auth\/mfa\/verify/);
+  assert.match(api, /\/api\/shell\/v1\/auth\/mfa\/setup-required\/start/);
+  assert.match(api, /\/api\/shell\/v1\/auth\/mfa\/setup-required\/activate/);
+  // The only thing ever written to storage is the access token of a completed session.
+  const writes = (api + app).match(/sessionStorage\.setItem\([^,]+/g) ?? [];
+  assert.ok(writes.length >= 1 && writes.every((write) => write === 'sessionStorage.setItem("idax.accessToken"'), writes.join(" | "));
+  const local = app.match(/localStorage\.setItem\("[^"]+"/g) ?? [];
+  assert.ok(local.every((write) => /"idax\.(sidebarWidth|sidebarCollapsed|locale)"/.test(write)), local.join(" | "));
+  assert.doesNotMatch(api + app, /console\.(log|debug|info)\(/);
+  assert.match(app, /MFA_SETUP/);
+  assert.doesNotMatch(app, /login\.mfaUnsupported/);
 });
