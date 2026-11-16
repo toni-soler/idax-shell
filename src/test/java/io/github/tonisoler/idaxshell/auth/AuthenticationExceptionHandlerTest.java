@@ -32,4 +32,21 @@ class AuthenticationExceptionHandlerTest {
         assertEquals("RATE_LIMITED", response.getBody().get("code"));
         assertEquals(lockedUntil.toString(), OffsetDateTime.parse(response.getBody().get("lockedUntil")).toString());
     }
+
+    @Test void knownMfaOutcomesKeepTheirCodeAndAStatusAClientCanActOn() {
+        var wrong = handler.mfaOutcome(new IllegalArgumentException("INVALID_TOTP"));
+        assertEquals(HttpStatus.UNAUTHORIZED, wrong.getStatusCode());
+        assertEquals("INVALID_TOTP", wrong.getBody().get("code"));
+        assertEquals(HttpStatus.UNAUTHORIZED, handler.mfaOutcome(new IllegalArgumentException("INVALID_MFA_CHALLENGE")).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED, handler.mfaOutcome(new IllegalArgumentException("MFA_SETUP_EXPIRED")).getStatusCode());
+        assertEquals(HttpStatus.CONFLICT, handler.mfaOutcome(new IllegalArgumentException("MFA_ACTIVATION_CONFLICT")).getStatusCode());
+    }
+
+    @Test void anyOtherArgumentFailureStaysOpaque() {
+        var other = handler.mfaOutcome(new IllegalArgumentException("Some internal detail about user 42"));
+        assertEquals(HttpStatus.BAD_REQUEST, other.getStatusCode());
+        assertEquals("AUTHENTICATION_FAILED", other.getBody().get("code"));
+        assertFalse(other.getBody().values().stream().anyMatch(v -> v.contains("42")));
+        assertEquals("AUTHENTICATION_FAILED", handler.mfaOutcome(new IllegalArgumentException((String) null)).getBody().get("code"));
+    }
 }
