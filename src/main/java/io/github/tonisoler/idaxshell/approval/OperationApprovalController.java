@@ -4,6 +4,9 @@ import es.idynamicsax.idax.security.CurrentUser;
 import es.idynamicsax.idax.security.approval.OperationApprovalTokenIssuer;
 import es.idynamicsax.idax.service.auth.OperationApprovalService;
 import es.idynamicsax.idax.service.security.AuthRateLimiterService;
+import io.github.tonisoler.idaxshell.auth.LocalAuthenticationService;
+import java.util.UUID;
+import org.springframework.web.bind.annotation.PathVariable;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -26,7 +29,10 @@ import org.springframework.web.bind.annotation.RestController;
  * Per-operation step-up for the signed-in user: confirm ONE specific operation with a fresh
  * authenticator code and receive a short-lived approval for exactly that operation. The approval is
  * useless on its own - the service that executes the operation verifies it against what it is
- * about to do and consumes it once. Authenticated only (never under the public /auth/** paths);
+ * about to do and consumes it once. Authenticated only (never under the public /auth/** paths)
+ * and scoped to one workspace by its path: the approval is bound to that workspace, and only a
+ * member of it can obtain one (the platform filter resolves a path tenant but does not check
+ * membership, so this endpoint does);
  * there is no way to obtain an approval for another user, with a recovery code, or without active
  * two-step verification. All rules live in Core's OperationApprovalService.
  */
@@ -39,15 +45,27 @@ public class OperationApprovalController {
       "INVALID_TOTP", HttpStatus.FORBIDDEN,
       "MFA_NOT_ENABLED", HttpStatus.CONFLICT,
       "OPERATION_APPROVAL_USER_REQUIRED", HttpStatus.FORBIDDEN,
+      "OPERATION_APPROVAL_TENANT_FORBIDDEN", HttpStatus.FORBIDDEN,
       "INVALID_OPERATION_APPROVAL_REQUEST", HttpStatus.BAD_REQUEST);
 
   private final OperationApprovalService approvals;
-  public OperationApprovalController(OperationApprovalService approvals) { this.approvals = approvals; }
+  private final LocalAuthenticationService authentication;
+  public OperationApprovalController(OperationApprovalService approvals, LocalAuthenticationService authentication) {
+    this.approvals = approvals; this.authentication = authentication;
+  }
 
-  @PostMapping("/operation-approvals")
-  public Approval approve(@AuthenticationPrincipal CurrentUser currentUser, @Valid @RequestBody ApprovalRequest request) {
+  @PostMapping("/tenants/{tenantId}/operation-approvals")
+  public Approval approve(@PathVariable UUID tenantId, @AuthenticationPrincipal CurrentUser currentUser,
+                          @Valid @RequestBody ApprovalRequest request) {
+    if (currentUser == null || currentUser.isService() || !authentication.isActiveMember(currentUser.getUserId(), tenantId)) {
+      throw new IllegalArgumentException("OPERATION_APPROVAL_TENANT_FORBIDDEN");
+    }
+    // The approval is for the workspace in the path (the one the operation will run in), which
+    // may differ from the workspace the session token was issued for.
+    CurrentUser inWorkspace = new CurrentUser(currentUser.getUserId(), currentUser.getUsername(), tenantId,
+        currentUser.isSuperuser(), currentUser.getRoles(), currentUser.isLocallyAuthenticated());
     OperationApprovalTokenIssuer.Issued issued = approvals.approve(
-        currentUser, request.action(), request.resource(), request.intentDigest(), request.code());
+        inWorkspace, request.action(), request.resource(), request.intentDigest(), request.code());
     return new Approval(issued.token(), issued.expiresAt());
   }
 

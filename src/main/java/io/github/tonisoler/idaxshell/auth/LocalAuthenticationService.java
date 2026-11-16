@@ -93,6 +93,11 @@ public class LocalAuthenticationService {
         toUser(user, currentUser), tenantViews(user.getId()));
   }
 
+  /** Whether the user is a member of this active workspace - the same set a session lists. */
+  public boolean isActiveMember(UUID userId, UUID tenantId) {
+    return userId != null && tenantId != null && tenantViews(userId).stream().anyMatch(tenant -> tenantId.equals(tenant.id()));
+  }
+
   private List<TenantView> tenantViews(UUID userId) {
     return tenants.findAllById(memberships.findTenantIdsByUserId(userId)).stream()
         .filter(tenant -> "active".equalsIgnoreCase(tenant.getStatus()))

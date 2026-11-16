@@ -1,12 +1,15 @@
 package io.github.tonisoler.idaxshell.approval;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import es.idynamicsax.idax.security.CurrentUser;
 import es.idynamicsax.idax.security.approval.OperationApprovalTokenIssuer;
 import es.idynamicsax.idax.service.auth.OperationApprovalService;
 import es.idynamicsax.idax.service.security.AuthRateLimiterService;
+import io.github.tonisoler.idaxshell.auth.LocalAuthenticationService;
+import org.mockito.ArgumentCaptor;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.Set;
@@ -17,17 +20,32 @@ import org.springframework.http.HttpStatus;
 class OperationApprovalControllerTest {
   private static final String DIGEST = "a".repeat(64);
   private final OperationApprovalService approvals = mock(OperationApprovalService.class);
-  private final OperationApprovalController controller = new OperationApprovalController(approvals);
+  private final LocalAuthenticationService authentication = mock(LocalAuthenticationService.class);
+  private final OperationApprovalController controller = new OperationApprovalController(approvals, authentication);
+  private final UUID workspace = UUID.randomUUID();
   private final CurrentUser user = new CurrentUser(UUID.randomUUID(), "local:ana", UUID.randomUUID(), false, Set.of());
 
   @Test void theApprovalIsRequestedForTheSignedInUserAndTheExactOperation() {
     Instant expiresAt = Instant.now().plusSeconds(120);
-    when(approvals.approve(user, "OSTRIS_CREDENTIAL_ADD", "controller", DIGEST, "123456"))
+    when(authentication.isActiveMember(user.getUserId(), workspace)).thenReturn(true);
+    ArgumentCaptor<CurrentUser> principal = ArgumentCaptor.forClass(CurrentUser.class);
+    when(approvals.approve(principal.capture(), eq("OSTRIS_CREDENTIAL_ADD"), eq("controller"), eq(DIGEST), eq("123456")))
         .thenReturn(new OperationApprovalTokenIssuer.Issued("token", UUID.randomUUID(), expiresAt));
-    var approval = controller.approve(user,
+    var approval = controller.approve(workspace, user,
         new OperationApprovalController.ApprovalRequest("OSTRIS_CREDENTIAL_ADD", "controller", DIGEST, "123456"));
     assertEquals("token", approval.approvalToken());
     assertEquals(expiresAt, approval.expiresAt());
+    // bound to the signed-in user and to the workspace of the path, not the token's own workspace
+    assertEquals(user.getUserId(), principal.getValue().getUserId());
+    assertEquals(workspace, principal.getValue().getTenantId());
+  }
+
+  @Test void aNonMemberOfTheWorkspaceGetsNoApprovalAndNoCodeIsEvenChecked() {
+    when(authentication.isActiveMember(user.getUserId(), workspace)).thenReturn(false);
+    var refused = assertThrows(IllegalArgumentException.class, () -> controller.approve(workspace, user,
+        new OperationApprovalController.ApprovalRequest("OSTRIS_CREDENTIAL_ADD", "controller", DIGEST, "123456")));
+    assertEquals(HttpStatus.FORBIDDEN, controller.refused(refused).getStatusCode());
+    verifyNoInteractions(approvals);
   }
 
   @Test void aWrongCodeIsForbiddenNotUnauthorizedSoTheSessionIsNotMistakenForExpired() {
