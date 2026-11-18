@@ -5,13 +5,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import es.idynamicsax.idax.service.permission.RolePermissionService;
 import es.idynamicsax.idax.service.permission.dto.PermissionInfo;
 import es.idynamicsax.idax.service.permission.dto.RoleRequest;
 import es.idynamicsax.idax.service.permission.dto.RoleSummary;
 import es.idynamicsax.idax.service.permission.dto.RoleUserInfo;
 import io.github.tonisoler.idaxshell.extensions.ExtensionRegistry;
+import io.github.tonisoler.idaxshell.extensions.RoleTemplate;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -28,11 +28,12 @@ class RoleTemplateServiceTest {
   final RolePermissionService roles = mock(RolePermissionService.class);
   final RoleTemplateService service;
 
-  RoleTemplateServiceTest() throws Exception {
-    var registry = new ExtensionRegistry(new ObjectMapper().readTree("""
-        {"schemaVersion":1,"extensions":[{"id":"garden","name":"Garden","route":"/garden","roleTemplates":[
-          {"key":"member","name":"Garden member","permissions":["garden.beds.read","garden.water"],"defaultForNewMembers":true},
-          {"key":"steward","name":"Garden steward","permissions":["garden.beds.manage"]}]}]}"""));
+  RoleTemplateServiceTest() {
+    // The manifest parsing itself is RoleTemplateManifestTest's subject.
+    var registry = mock(ExtensionRegistry.class);
+    when(registry.roleTemplates()).thenReturn(List.of(
+        new RoleTemplate("garden", "Garden", "member", "Garden member", "", List.of("garden.beds.read", "garden.water"), true),
+        new RoleTemplate("garden", "Garden", "steward", "Garden steward", "", List.of("garden.beds.manage"), false)));
     service = new RoleTemplateService(registry, roles);
     when(roles.permissionCatalog()).thenReturn(List.of(permission("garden.beds.read"), permission("garden.water"), permission("garden.beds.manage")));
   }
