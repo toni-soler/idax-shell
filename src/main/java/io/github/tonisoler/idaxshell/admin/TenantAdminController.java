@@ -50,13 +50,14 @@ public class TenantAdminController {
   private final TenantSetEnabledRepository setEnabledRepository;
   private final TenantUpdateNameRepository updateNameRepository;
   private final JdbcTemplate jdbcTemplate;
+  private final RoleTemplateService templates;
 
   public TenantAdminController(TenantSearchGlobalRepository search, TenantCreateRepository create,
       TenantUserService tenantUsers, TenantSetEnabledRepository setEnabledRepository,
-      TenantUpdateNameRepository updateNameRepository, JdbcTemplate jdbcTemplate) {
+      TenantUpdateNameRepository updateNameRepository, JdbcTemplate jdbcTemplate, RoleTemplateService templates) {
     this.search = search; this.create = create; this.tenantUsers = tenantUsers;
     this.setEnabledRepository = setEnabledRepository; this.updateNameRepository = updateNameRepository;
-    this.jdbcTemplate = jdbcTemplate;
+    this.jdbcTemplate = jdbcTemplate; this.templates = templates;
   }
 
   @GetMapping
@@ -86,9 +87,12 @@ public class TenantAdminController {
     });
     TenantContext.set(new TenantContext(tenant.tenantId(), tenant.code(), caller.getUserId(), caller.getUsername(), TenantContext.DbRole.IDAX_ADMIN));
     try {
-      tenantUsers.create(tenant.tenantId(), new TenantUserRequest(
+      var owner = tenantUsers.create(tenant.tenantId(), new TenantUserRequest(
           request.adminEmail().trim(), request.adminEmail().trim(), request.adminDisplayName().trim(),
           "local", request.adminPassword(), "owner", Boolean.TRUE, Boolean.FALSE));
+      // The new workspace starts with the installed modules' template roles, and its first
+      // administrator is also a member: they get the default ones like everyone else.
+      templates.assignDefaults(tenant.tenantId(), owner.userId());
     } finally {
       TenantContext.clear();
     }
