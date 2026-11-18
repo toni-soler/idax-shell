@@ -134,3 +134,21 @@ test("two-step sign-in follows the shell contracts and keeps secrets out of stor
   assert.match(app, /MFA_SETUP/);
   assert.doesNotMatch(app, /login\.mfaUnsupported/);
 });
+
+test("module role templates: new members start with the default roles, which are never silently dropped or deleted", () => {
+  const crud = read("../src/CrudWorkspace.jsx");
+  const api = read("../src/api.js");
+  assert.match(api, /roleTemplates: \(tenantId\) => request\(`\/api\/shell\/v1\/tenants\/\$\{encodeURIComponent\(tenantId\)\}\/roles\/templates`\)/);
+  assert.match(api, /\/roles\/templates\/apply`, \{ method: "POST"/);
+  // the creation form shows the current default template roles ticked until the administrator
+  // touches them, even when the templates arrive after the form opened
+  assert.match(crud, /kind === "users" && !isEditing && !value\.rolesTouched \? defaultRoleIds/);
+  assert.match(crud, /defaultRoleIds=\{defaultRoleIds\}/);
+  // a new member's roles are only replaced when the administrator changed that selection, so the
+  // defaults the backend gave them are not wiped by an untouched form
+  assert.match(crud, /savedId && \(id \|\| value\.rolesTouched\)/);
+  assert.match(crud, /rolesTouched: true/);
+  // a template role is disabled, never deleted (the backend refuses it too)
+  assert.match(crud, /disabled=\{Boolean\(row\.systemRole\) \|\| \(kind === "roles" && isTemplateRole\(row\)\)\}/);
+  assert.match(crud, /row\.sourceType === "EXTENSION_TEMPLATE"/);
+});

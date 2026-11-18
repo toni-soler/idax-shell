@@ -42,7 +42,8 @@ class TenantAdminControllerTest {
     TenantSetEnabledRepository setEnabled = mock(TenantSetEnabledRepository.class);
     TenantUpdateNameRepository updateName = mock(TenantUpdateNameRepository.class);
     JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
-    TenantAdminController controller = new TenantAdminController(search, create, tenantUsers, setEnabled, updateName, jdbcTemplate);
+    RoleTemplateService templates = mock(RoleTemplateService.class);
+    TenantAdminController controller = new TenantAdminController(search, create, tenantUsers, setEnabled, updateName, jdbcTemplate, templates);
     CurrentUser caller = new CurrentUser(UUID.randomUUID(), "admin@stir.es", null, true, Set.of("ROLE_SUPERUSER"));
 
     @Test void createComposesTenantCreationAndItsFirstLocalAdminWithoutTouchingDataArea() {
@@ -50,7 +51,10 @@ class TenantAdminControllerTest {
         OffsetDateTime createdAt = OffsetDateTime.now();
         when(create.create("stir-pruebas", "STIR - pruebas", "active", false))
             .thenReturn(new TenantCreateRepository.TenantRow(tenantId, "stir-pruebas", "STIR - pruebas", "active", false, createdAt, createdAt));
-        when(tenantUsers.create(eq(tenantId), any())).thenReturn(mock(TenantUserResponse.class));
+        UUID ownerId = UUID.randomUUID();
+        TenantUserResponse owner = mock(TenantUserResponse.class);
+        when(owner.userId()).thenReturn(ownerId);
+        when(tenantUsers.create(eq(tenantId), any())).thenReturn(owner);
 
         var result = controller.create(new TenantAdminController.TenantCreateRequest(
             "stir-pruebas", "STIR - pruebas", "admin.pruebas@stir.es", "Admin Pruebas", "hunter22"), caller);
@@ -71,6 +75,12 @@ class TenantAdminControllerTest {
         assertEquals("hunter22", request.password());
         assertEquals("owner", request.role());
         assertEquals(Boolean.TRUE, request.enabled());
+
+        // The new workspace gets the modules' template roles, and its first administrator the
+        // default ones, inside the same elevated context (after the owner exists).
+        var order = inOrder(tenantUsers, templates);
+        order.verify(tenantUsers).create(eq(tenantId), any());
+        order.verify(templates).assignDefaults(tenantId, ownerId);
 
         assertEquals(tenantId, result.id());
         assertEquals("stir-pruebas", result.code());

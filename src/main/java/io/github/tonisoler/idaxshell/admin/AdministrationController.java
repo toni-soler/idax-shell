@@ -28,6 +28,8 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.*;
 
 import static es.idynamicsax.idax.alerts.dto.SavedFilterAlertDtos.*;
@@ -42,12 +44,13 @@ public class AdministrationController {
   private final SavedFilterAlertService alerts;
   private final SavedFilterAlertRunnerService alertRunner;
   private final ObjectMapper mapper;
+  private final RoleTemplateService templates;
 
   public AdministrationController(TenantUserService users, RolePermissionService roles,
       UserPreferencesService preferences, SavedFilterAlertService alerts,
-      SavedFilterAlertRunnerService alertRunner, ObjectMapper mapper) {
+      SavedFilterAlertRunnerService alertRunner, ObjectMapper mapper, RoleTemplateService templates) {
     this.users = users; this.roles = roles; this.preferences = preferences;
-    this.alerts = alerts; this.alertRunner = alertRunner; this.mapper = mapper;
+    this.alerts = alerts; this.alertRunner = alertRunner; this.mapper = mapper; this.templates = templates;
   }
 
   @GetMapping("/users")
@@ -56,8 +59,13 @@ public class AdministrationController {
 
   @PostMapping("/users") @ResponseStatus(HttpStatus.CREATED)
   @PreAuthorize("@tenantAuth.validateTenantAccess(#tenantId) and @permissionService.hasPermission('system.users.create')")
+  @Transactional
   public TenantUserResponse createUser(@PathVariable UUID tenantId, @RequestBody TenantUserRequest request) {
-    return users.create(tenantId, request);
+    TenantUserResponse created = users.create(tenantId, request);
+    // A new member joins with the roles the installed modules declare as default (RoleTemplateService),
+    // in the same transaction: never a member who exists without them.
+    templates.assignDefaults(tenantId, created.userId());
+    return created;
   }
 
   @PutMapping("/users/{userId}")
@@ -75,17 +83,45 @@ public class AdministrationController {
 
   @PostMapping("/roles") @ResponseStatus(HttpStatus.CREATED)
   @PreAuthorize("@tenantAuth.validateTenantAccess(#tenantId) and @permissionService.hasPermission('system.roles.manage')")
-  public RoleSummary createRole(@PathVariable UUID tenantId, @RequestBody RoleRequest request) { return roles.create(tenantId, request); }
+  public RoleSummary createRole(@PathVariable UUID tenantId, @RequestBody RoleRequest request) {
+    return roles.create(tenantId, guardTemplateSource(tenantId, null, request));
+  }
 
   @PutMapping("/roles/{roleId}")
   @PreAuthorize("@tenantAuth.validateTenantAccess(#tenantId) and @permissionService.hasPermission('system.roles.manage')")
   public RoleSummary updateRole(@PathVariable UUID tenantId, @PathVariable UUID roleId, @RequestBody RoleRequest request) {
-    return roles.update(tenantId, roleId, request);
+    return roles.update(tenantId, roleId, guardTemplateSource(tenantId, roleId, request));
   }
 
   @DeleteMapping("/roles/{roleId}") @ResponseStatus(HttpStatus.NO_CONTENT)
   @PreAuthorize("@tenantAuth.validateTenantAccess(#tenantId) and @permissionService.hasPermission('system.roles.manage')")
-  public void deleteRole(@PathVariable UUID tenantId, @PathVariable UUID roleId) { roles.delete(tenantId, roleId); }
+  public void deleteRole(@PathVariable UUID tenantId, @PathVariable UUID roleId) {
+    // A module's template role would be recreated by the next reconciliation: disable it instead.
+    if (templates.isTemplateRole(tenantId, roleId))
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "A module role template cannot be deleted; disable it instead");
+    roles.delete(tenantId, roleId);
+  }
+
+  @GetMapping("/roles/templates")
+  @PreAuthorize("@tenantAuth.validateTenantAccess(#tenantId) and @permissionService.hasPermission('system.roles.read')")
+  public List<RoleTemplateService.TemplateState> roleTemplates(@PathVariable UUID tenantId) { return templates.describe(tenantId); }
+
+  @PostMapping("/roles/templates/apply")
+  @PreAuthorize("@tenantAuth.validateTenantAccess(#tenantId) and @permissionService.hasPermission('system.roles.manage')")
+  @Transactional
+  public RoleTemplateService.ApplyResult applyRoleTemplates(@PathVariable UUID tenantId, @RequestBody(required = false) ApplyTemplatesRequest request) {
+    return templates.apply(tenantId, request != null && request.assignToExistingMembers());
+  }
+
+  public record ApplyTemplatesRequest(boolean assignToExistingMembers) {}
+
+  private RoleRequest guardTemplateSource(UUID tenantId, UUID roleId, RoleRequest request) {
+    try {
+      return templates.guard(tenantId, roleId, request);
+    } catch (IllegalArgumentException refused) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, refused.getMessage());
+    }
+  }
 
   @GetMapping("/roles/catalog")
   @PreAuthorize("@tenantAuth.validateTenantAccess(#tenantId) and @permissionService.hasPermission('system.roles.read')")
