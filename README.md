@@ -10,6 +10,8 @@ legacy integration or generator source.
 - the architecture and reuse gate for login, JWT, secure first-owner bootstrap,
   tenants, users, memberships, roles and permissions;
 - responsive base navigation and versioned frontend extension discovery;
+- [module role templates](docs/MODULE_ROLE_TEMPLATES.md): an extension declares the roles it
+  needs; the Shell keeps them in every workspace and new members join with the default ones;
 - a production-oriented Compose topology for PostgreSQL, Core, Shell, Ledger,
   osTRIS and Caddy;
 - CycloneDX SBOM generation and guarded public-source promotion scripts.
