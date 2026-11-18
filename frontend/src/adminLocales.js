@@ -13,7 +13,12 @@ const en = {
   "tenants.adminDisplayName": "Administrator display name", "tenants.adminEmail": "Administrator email",
   "tenants.adminPassword": "Administrator password", "tenants.adminPasswordHint": "The first administrator account for this new workspace. Share these credentials securely.",
   "tenants.enable": "Enable", "tenants.disable": "Disable",
-  "state.enabled": "Enabled", "state.disabled": "Disabled"
+  "state.enabled": "Enabled", "state.disabled": "Disabled",
+  "field.origin": "Origin", "roles.originModule": "Module template", "roles.originWorkspace": "This workspace",
+  "roles.applyTemplates": "Give module roles to current members",
+  "roles.applyTemplatesConfirm": "Bring the module role templates up to date and give their default roles to every current member who lacks them? Members keep the roles they already have.",
+  "roles.applyTemplatesDone": "Module roles are up to date. {count} members received their default roles.",
+  "roles.templateNoDelete": "A module template role cannot be deleted. Disable it instead: a disabled role is not given to anyone."
 };
 
 const es = {
@@ -32,7 +37,12 @@ const es = {
   "tenants.adminDisplayName": "Nombre visible del administrador", "tenants.adminEmail": "Correo del administrador",
   "tenants.adminPassword": "Contraseña del administrador", "tenants.adminPasswordHint": "La primera cuenta administradora de este espacio nuevo. Comparte estas credenciales de forma segura.",
   "tenants.enable": "Activar", "tenants.disable": "Desactivar",
-  "state.enabled": "Activo", "state.disabled": "Inactivo"
+  "state.enabled": "Activo", "state.disabled": "Inactivo",
+  "field.origin": "Origen", "roles.originModule": "Plantilla de módulo", "roles.originWorkspace": "Este espacio",
+  "roles.applyTemplates": "Dar los roles de los módulos a los miembros actuales",
+  "roles.applyTemplatesConfirm": "¿Actualizar las plantillas de rol de los módulos y dar sus roles por defecto a cada miembro actual que no los tenga? Los miembros conservan los roles que ya tienen.",
+  "roles.applyTemplatesDone": "Los roles de los módulos están al día. {count} miembros recibieron sus roles por defecto.",
+  "roles.templateNoDelete": "Un rol de plantilla de módulo no se puede eliminar. Desactívalo: un rol desactivado no se da a nadie."
 };
 
 export const adminLocales = { es, en, ca: { ...en }, de: { ...en }, fr: { ...en }, it: { ...en }, pt: { ...en }, jp: { ...en }, eu: { ...en }, gl: { ...en }, "pt-BR": { ...en }, zh: { ...en } };
