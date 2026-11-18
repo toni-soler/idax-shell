@@ -140,8 +140,10 @@ test("module role templates: new members start with the default roles, which are
   const api = read("../src/api.js");
   assert.match(api, /roleTemplates: \(tenantId\) => request\(`\/api\/shell\/v1\/tenants\/\$\{encodeURIComponent\(tenantId\)\}\/roles\/templates`\)/);
   assert.match(api, /\/roles\/templates\/apply`, \{ method: "POST"/);
-  // the creation form opens with the default template roles ticked
-  assert.match(crud, /setCreating\(kind === "users" \? \{ authProvider: "local", role: "user", roles: defaultRoleIds \}/);
+  // the creation form shows the current default template roles ticked until the administrator
+  // touches them, even when the templates arrive after the form opened
+  assert.match(crud, /kind === "users" && !isEditing && !value\.rolesTouched \? defaultRoleIds/);
+  assert.match(crud, /defaultRoleIds=\{defaultRoleIds\}/);
   // a new member's roles are only replaced when the administrator changed that selection, so the
   // defaults the backend gave them are not wiped by an untouched form
   assert.match(crud, /savedId && \(id \|\| value\.rolesTouched\)/);
