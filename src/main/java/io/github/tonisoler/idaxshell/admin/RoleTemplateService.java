@@ -117,6 +117,23 @@ public class RoleTemplateService {
     return new ApplyResult(describe(tenantId), assigned);
   }
 
+  /**
+   * The request to send to Core when an administrator creates or updates a role. A template role
+   * keeps its source whatever the client sends (Core would otherwise clear a missing sourceKey,
+   * cutting the role off its template and duplicating it on the next reconciliation), and no other
+   * role may claim to be a template.
+   */
+  public RoleRequest guard(UUID tenantId, UUID roleId, RoleRequest request) {
+    RoleSummary current = roleId == null ? null : roles.listRoles(tenantId).stream()
+        .filter(role -> role.id().equals(roleId)).findFirst().orElse(null);
+    if (current != null && SOURCE_TYPE.equals(current.sourceType()) && current.sourceKey() != null)
+      return new RoleRequest(request.key(), request.name(), request.description(), request.enabled(),
+          current.sourceType(), current.sourceKey(), request.permissions());
+    if (SOURCE_TYPE.equalsIgnoreCase(String.valueOf(request.sourceType())))
+      throw new IllegalArgumentException("Only a module's role template may use source " + SOURCE_TYPE);
+    return request;
+  }
+
   /** True when this role implements a module's template. */
   public boolean isTemplateRole(UUID tenantId, UUID roleId) {
     return roles.listRoles(tenantId).stream()

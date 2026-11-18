@@ -127,6 +127,25 @@ class RoleTemplateServiceTest {
     verify(roles, never()).replaceUserRoles(eq(TENANT), eq(has), any());
   }
 
+  @Test void updatingATemplateRoleKeepsItsSourceAndNoOtherRoleCanClaimOne() {
+    UUID template = UUID.randomUUID(), plain = UUID.randomUUID();
+    when(roles.listRoles(TENANT)).thenReturn(List.of(role(template, "garden:member", true),
+        new RoleSummary(plain, "own", "Own", null, true, false, "IDAX", null, 0, 0)));
+
+    var renamed = service.guard(TENANT, template, new RoleRequest(null, "Gardeners", null, false, null, null, null));
+    assertEquals("Gardeners", renamed.name());
+    assertEquals(Boolean.FALSE, renamed.enabled());
+    assertEquals("EXTENSION_TEMPLATE", renamed.sourceType());
+    assertEquals("garden:member", renamed.sourceKey(), "Core would clear a missing sourceKey");
+
+    var own = new RoleRequest("own", "Own", null, true, null, null, null);
+    assertSame(own, service.guard(TENANT, plain, own));
+    assertThrows(IllegalArgumentException.class, () -> service.guard(TENANT, plain,
+        new RoleRequest("own", "Own", null, true, "extension_template", "garden:member", null)));
+    assertThrows(IllegalArgumentException.class, () -> service.guard(TENANT, null,
+        new RoleRequest("fake", "Fake", null, true, "EXTENSION_TEMPLATE", "garden:steward", null)));
+  }
+
   @Test void onlyRolesThatImplementATemplateAreTemplateRoles() {
     UUID template = UUID.randomUUID(), plain = UUID.randomUUID();
     when(roles.listRoles(TENANT)).thenReturn(List.of(role(template, "garden:member", true),

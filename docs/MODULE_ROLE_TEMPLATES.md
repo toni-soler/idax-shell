@@ -52,7 +52,9 @@ key.
 
 ## What administrators control
 
-- **Rename** a template role, or change its description: the link to the template is kept.
+- **Rename** a template role, or change its description: the link to the template is kept. The
+  Shell keeps a template role's source on every update whatever the client sends, and refuses
+  any other role that claims the `EXTENSION_TEMPLATE` source.
 - **Disable** it: a disabled template role is never given to anyone, including new members.
 - **Delete** it: refused (`409`). It would be recreated on the next reconciliation. Disable it
   instead.

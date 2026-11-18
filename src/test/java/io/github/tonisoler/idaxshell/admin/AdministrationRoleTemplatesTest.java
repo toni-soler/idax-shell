@@ -51,6 +51,21 @@ class AdministrationRoleTemplatesTest {
     verify(roles).delete(tenant, plain);
   }
 
+  @Test void roleWritesGoThroughTheTemplateGuard() {
+    UUID roleId = UUID.randomUUID();
+    var request = new es.idynamicsax.idax.service.permission.dto.RoleRequest("k", "N", null, true, null, null, null);
+    var guarded = new es.idynamicsax.idax.service.permission.dto.RoleRequest("k", "N", null, true, "EXTENSION_TEMPLATE", "garden:member", null);
+    when(templates.guard(tenant, roleId, request)).thenReturn(guarded);
+    controller.updateRole(tenant, roleId, request);
+    verify(roles).update(tenant, roleId, guarded);
+
+    var claim = new es.idynamicsax.idax.service.permission.dto.RoleRequest("f", "F", null, true, "EXTENSION_TEMPLATE", "garden:x", null);
+    when(templates.guard(tenant, null, claim)).thenThrow(new IllegalArgumentException("no"));
+    var refused = assertThrows(ResponseStatusException.class, () -> controller.createRole(tenant, claim));
+    assertEquals(400, refused.getStatusCode().value());
+    verify(roles, never()).create(any(), any());
+  }
+
   @Test void applyingReconcilesAndOnlyAssignsExistingMembersWhenAsked() {
     when(templates.apply(any(), anyBoolean())).thenReturn(new RoleTemplateService.ApplyResult(List.of(), 0));
     controller.applyRoleTemplates(tenant, null);

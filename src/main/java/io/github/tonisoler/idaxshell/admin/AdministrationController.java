@@ -83,12 +83,14 @@ public class AdministrationController {
 
   @PostMapping("/roles") @ResponseStatus(HttpStatus.CREATED)
   @PreAuthorize("@tenantAuth.validateTenantAccess(#tenantId) and @permissionService.hasPermission('system.roles.manage')")
-  public RoleSummary createRole(@PathVariable UUID tenantId, @RequestBody RoleRequest request) { return roles.create(tenantId, request); }
+  public RoleSummary createRole(@PathVariable UUID tenantId, @RequestBody RoleRequest request) {
+    return roles.create(tenantId, guardTemplateSource(tenantId, null, request));
+  }
 
   @PutMapping("/roles/{roleId}")
   @PreAuthorize("@tenantAuth.validateTenantAccess(#tenantId) and @permissionService.hasPermission('system.roles.manage')")
   public RoleSummary updateRole(@PathVariable UUID tenantId, @PathVariable UUID roleId, @RequestBody RoleRequest request) {
-    return roles.update(tenantId, roleId, request);
+    return roles.update(tenantId, roleId, guardTemplateSource(tenantId, roleId, request));
   }
 
   @DeleteMapping("/roles/{roleId}") @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -112,6 +114,14 @@ public class AdministrationController {
   }
 
   public record ApplyTemplatesRequest(boolean assignToExistingMembers) {}
+
+  private RoleRequest guardTemplateSource(UUID tenantId, UUID roleId, RoleRequest request) {
+    try {
+      return templates.guard(tenantId, roleId, request);
+    } catch (IllegalArgumentException refused) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, refused.getMessage());
+    }
+  }
 
   @GetMapping("/roles/catalog")
   @PreAuthorize("@tenantAuth.validateTenantAccess(#tenantId) and @permissionService.hasPermission('system.roles.read')")
